@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FinansTakip - Profile &amp; Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;family=Manrope:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary-fixed-variant": "#92002a",
+              "on-primary-fixed-variant": "#005236",
+              "secondary-fixed-dim": "#adc6ff",
+              "secondary": "#adc6ff",
+              "outline": "#86948a",
+              "tertiary-container": "#ff7886",
+              "tertiary": "#ffb2b7",
+              "on-secondary-fixed": "#001a42",
+              "surface": "#131316",
+              "on-error-container": "#ffdad6",
+              "on-error": "#690005",
+              "on-secondary-fixed-variant": "#004395",
+              "primary": "#4edea3",
+              "on-primary-container": "#00422b",
+              "inverse-surface": "#e4e1e6",
+              "surface-variant": "#353438",
+              "secondary-container": "#0566d9",
+              "surface-container": "#1f1f22",
+              "outline-variant": "#3c4a42",
+              "surface-dim": "#131316",
+              "on-primary": "#003824",
+              "inverse-on-surface": "#303033",
+              "surface-container-high": "#2a2a2d",
+              "on-surface": "#e4e1e6",
+              "inverse-primary": "#006c49",
+              "surface-container-lowest": "#0e0e11",
+              "on-background": "#e4e1e6",
+              "on-secondary-container": "#e6ecff",
+              "surface-tint": "#4edea3",
+              "surface-container-highest": "#353438",
+              "secondary-fixed": "#d8e2ff",
+              "on-tertiary-container": "#780021",
+              "error": "#ffb4ab",
+              "error-container": "#93000a",
+              "primary-fixed": "#6ffbbe",
+              "primary-container": "#10b981",
+              "on-secondary": "#002e6a",
+              "on-tertiary": "#67001b",
+              "on-primary-fixed": "#002113",
+              "background": "#131316",
+              "tertiary-fixed-dim": "#ffb2b7",
+              "on-surface-variant": "#bbcabf",
+              "tertiary-fixed": "#ffdadb",
+              "primary-fixed-dim": "#4edea3",
+              "on-tertiary-fixed": "#40000d",
+              "surface-bright": "#39393c",
+              "surface-container-low": "#1b1b1e"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      body { background-color: #131316; font-family: 'Inter', sans-serif; }
+      .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+      .bento-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface antialiased pb-32">
+<!-- TopAppBar -->
+<header class="bg-[#131316] sticky top-0 z-50">
+<div class="flex justify-between items-center w-full px-6 py-4 max-w-none bg-[#1B1B1E]">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden border border-white/5">
+<img alt="User Profile Avatar" class="w-full h-full object-cover" data-alt="Close-up portrait of a professional man in a dark turtleneck with soft studio lighting and a neutral grey background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAN9Yk5ws6rV0wa73YTRdEnYA6lF4KYX7a5OgQFeRFnIWfSGyOAP_bhCW0BzXRzAmTLWtJlINkdtxYVqZcbXpWfiRBoZqmMUJ7YNPAJCNP3qAnE77ozIIM96zvdzER-VPIIxWyhL-rI42-m3lePi_ESgLapcKOL1trawS-JA8LjpZyykwCxW60ZF33IUnRi691tY3ZzUuAYrAV0CB9NCTXVy2G8M5BWrYF9XAxwNBejtaa22l4K82YnvkNQvNq9t2ZNOEetj8xN9sRY"/>
+</div>
+<h1 class="text-emerald-500 font-black tracking-tighter text-2xl font-['Inter']">FinansTakip</h1>
+</div>
+<button class="text-zinc-400 hover:bg-zinc-800 transition-colors p-2 rounded-xl scale-95 active:duration-150">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</div>
+</header>
+<main class="max-w-5xl mx-auto px-6 mt-8">
+<!-- Profile Header Section -->
+<section class="mb-10">
+<div class="bg-surface-container-low rounded-3xl p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-primary/10 transition-colors"></div>
+<div class="relative">
+<div class="w-32 h-32 rounded-3xl overflow-hidden border-4 border-surface-variant">
+<img alt="User Profile Avatar" class="w-full h-full object-cover" data-alt="Professional studio portrait of a man with clean aesthetic and soft cinematic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRTPRmaF5D1teRYngpc7FqaS5PHOMa_VYp8xd5X5uBSe6jEsap_8HUXD2-82ONTVEl5yRKH3R3R8wA2oLRnkoATJ6Nh0Fb118EqfjSyX-2EDdTVVW7Kn9xCsZzr3HH_OrSTJIMWASD6d5qYcK1Ve1-0rJN0Enkdtb9mQ5jh_iM9lX6B6pDEi9TcWbE8P9yu3qSkfxUIIDx4Pb4Ev3E7XvgozEFp7AUiLOgVgSGqPi8NUcgfT0u-miyj7rluA5v2o2gIBU-pz1E3qFS"/>
+</div>
+<div class="absolute -bottom-2 -right-2 bg-primary text-on-primary p-1.5 rounded-xl shadow-lg">
+<span class="material-symbols-outlined text-sm" data-icon="edit" style="font-variation-settings: 'FILL' 1;">edit</span>
+</div>
+</div>
+<div class="text-center md:text-left flex-1">
+<div class="flex flex-col md:flex-row md:items-center gap-2 mb-2">
+<h2 class="text-3xl font-black tracking-tight font-headline">Alex Johnston</h2>
+<span class="inline-flex items-center px-3 py-1 bg-primary-container/20 text-primary text-[10px] font-bold uppercase tracking-widest rounded-full border border-primary/20 self-center md:self-auto">
+                            Diamond Tier
+                        </span>
+</div>
+<p class="text-on-surface-variant font-label text-sm mb-6">alex.johnston@finanstakip.io • Member since 2022</p>
+<div class="flex flex-wrap gap-4 justify-center md:justify-start">
+<button class="px-6 py-2.5 bg-gradient-to-br from-primary-container to-primary text-on-primary font-bold rounded-full shadow-lg shadow-primary/10 transition-transform active:scale-95">
+                            Upgrade Plan
+                        </button>
+<button class="px-6 py-2.5 bg-surface-container-highest text-on-surface font-bold rounded-full hover:bg-surface-bright transition-colors">
+                            View Public Profile
+                        </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Settings Bento Grid -->
+<div class="bento-grid">
+<!-- Account & Security -->
+<div class="col-span-12 lg:col-span-7 bg-surface-container-low rounded-3xl p-8">
+<div class="flex items-center gap-3 mb-8">
+<span class="material-symbols-outlined text-primary" data-icon="shield_person">shield_person</span>
+<h3 class="text-xl font-bold font-headline tracking-tight">Account Security</h3>
+</div>
+<div class="space-y-4">
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl hover:bg-surface-container transition-colors cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="p-2 bg-surface-variant rounded-xl text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="passkey">passkey</span>
+</div>
+<div>
+<p class="font-bold text-sm">Two-Factor Authentication</p>
+<p class="text-xs text-on-surface-variant">Secure your account with 2FA</p>
+</div>
+</div>
+<span class="text-primary text-xs font-bold font-label">ENABLED</span>
+</div>
+<div class="group flex items-center justify-between p-4 rounded-2xl hover:bg-surface-container transition-colors cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="p-2 bg-surface-variant rounded-xl text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="link">link</span>
+</div>
+<div>
+<p class="font-bold text-sm">Linked Bank Accounts</p>
+<p class="text-xs text-on-surface-variant">Manage 4 connected institutions</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-zinc-600 group-hover:text-on-surface transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl hover:bg-surface-container transition-colors cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="p-2 bg-surface-variant rounded-xl text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="devices">devices</span>
+</div>
+<div>
+<p class="font-bold text-sm">Active Sessions</p>
+<p class="text-xs text-on-surface-variant">3 devices currently logged in</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-zinc-600 group-hover:text-on-surface transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Theme & Personalization -->
+<div class="col-span-12 lg:col-span-5 bg-surface-container-low rounded-3xl p-8">
+<div class="flex items-center gap-3 mb-8">
+<span class="material-symbols-outlined text-primary" data-icon="palette">palette</span>
+<h3 class="text-xl font-bold font-headline tracking-tight">Personalization</h3>
+</div>
+<div class="space-y-8">
+<div>
+<p class="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-4">Appearance</p>
+<div class="grid grid-cols-2 gap-3">
+<button class="flex items-center justify-center gap-2 p-3 bg-surface-container rounded-2xl border-2 border-primary text-primary font-bold transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="dark_mode" style="font-variation-settings: 'FILL' 1;">dark_mode</span>
+<span class="text-sm">Dark</span>
+</button>
+<button class="flex items-center justify-center gap-2 p-3 bg-surface-container-lowest rounded-2xl border-2 border-transparent text-on-surface-variant hover:border-outline-variant transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="light_mode">light_mode</span>
+<span class="text-sm">Light</span>
+</button>
+</div>
+</div>
+<div>
+<p class="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-4">Accent Color</p>
+<div class="flex gap-4">
+<div class="w-10 h-10 rounded-full bg-primary ring-4 ring-primary/20 cursor-pointer flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary text-sm" data-icon="check" style="font-variation-settings: 'wght' 700;">check</span>
+</div>
+<div class="w-10 h-10 rounded-full bg-secondary cursor-pointer hover:scale-110 transition-transform"></div>
+<div class="w-10 h-10 rounded-full bg-tertiary-container cursor-pointer hover:scale-110 transition-transform"></div>
+<div class="w-10 h-10 rounded-full bg-blue-500 cursor-pointer hover:scale-110 transition-transform"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Data & Privacy -->
+<div class="col-span-12 lg:col-span-6 bg-surface-container-low rounded-3xl p-8">
+<div class="flex items-center gap-3 mb-8">
+<span class="material-symbols-outlined text-primary" data-icon="lock">lock</span>
+<h3 class="text-xl font-bold font-headline tracking-tight">Data &amp; Privacy</h3>
+</div>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl group cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="download">download</span>
+<span class="font-bold text-sm">Export My Data (.JSON)</span>
+</div>
+<span class="material-symbols-outlined text-zinc-600" data-icon="arrow_forward">arrow_forward</span>
+</div>
+<div class="flex items-center justify-between p-4 rounded-2xl group cursor-pointer hover:bg-error-container/10 transition-colors">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-error" data-icon="delete_forever">delete_forever</span>
+<span class="font-bold text-sm text-error">Delete Account</span>
+</div>
+<span class="text-[10px] text-error font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Permanent Action</span>
+</div>
+</div>
+</div>
+<!-- Support & About -->
+<div class="col-span-12 lg:col-span-6 bg-surface-container-low rounded-3xl p-8">
+<div class="flex items-center gap-3 mb-8">
+<span class="material-symbols-outlined text-primary" data-icon="help_center">help_center</span>
+<h3 class="text-xl font-bold font-headline tracking-tight">Support &amp; About</h3>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-6 bg-surface-container-lowest rounded-2xl flex flex-col items-center justify-center text-center hover:bg-surface-container transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-primary mb-2 group-hover:scale-110 transition-transform" data-icon="chat_bubble">chat_bubble</span>
+<p class="text-xs font-bold">Live Support</p>
+</div>
+<div class="p-6 bg-surface-container-lowest rounded-2xl flex flex-col items-center justify-center text-center hover:bg-surface-container transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-primary mb-2 group-hover:scale-110 transition-transform" data-icon="article">article</span>
+<p class="text-xs font-bold">Help Center</p>
+</div>
+</div>
+<div class="mt-8 pt-8 border-t border-white/5 flex flex-col items-center">
+<p class="text-xs text-on-surface-variant font-label">FinansTakip v4.2.0-stable</p>
+<p class="text-[10px] text-zinc-600 mt-1 uppercase tracking-tighter">Made with precision for architects of finance</p>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 bg-[#131316]/80 backdrop-blur-xl border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] rounded-t-[2rem]">
+<div class="flex flex-col items-center justify-center text-zinc-500 px-4 py-2 hover:text-emerald-400 transition-all duration-300 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-tight">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-500 px-4 py-2 hover:text-emerald-400 transition-all duration-300 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-tight">Transactions</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-500 px-4 py-2 hover:text-emerald-400 transition-all duration-300 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-tight">Investments</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-500 px-4 py-2 hover:text-emerald-400 transition-all duration-300 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="emoji_events">emoji_events</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-tight">Goals</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-emerald-500/10 text-emerald-500 rounded-2xl px-4 py-2 transition-all duration-300 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="person" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-tight">Profile</span>
+</div>
+</nav>
+</body></html>

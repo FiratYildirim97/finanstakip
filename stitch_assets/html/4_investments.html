@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#4edea3",
+              "surface-container-low": "#1b1b1e",
+              "on-error": "#690005",
+              "error": "#ffb4ab",
+              "on-tertiary-fixed": "#40000d",
+              "inverse-on-surface": "#303033",
+              "on-surface-variant": "#bbcabf",
+              "inverse-surface": "#e4e1e6",
+              "surface-variant": "#353438",
+              "secondary": "#adc6ff",
+              "on-primary-container": "#00422b",
+              "on-surface": "#e4e1e6",
+              "surface": "#131316",
+              "inverse-primary": "#006c49",
+              "surface-container": "#1f1f22",
+              "on-error-container": "#ffdad6",
+              "on-tertiary": "#67001b",
+              "tertiary": "#ffb2b7",
+              "surface-container-highest": "#353438",
+              "error-container": "#93000a",
+              "tertiary-fixed-dim": "#ffb2b7",
+              "on-secondary-fixed-variant": "#004395",
+              "on-tertiary-container": "#780021",
+              "secondary-fixed-dim": "#adc6ff",
+              "surface-dim": "#131316",
+              "primary-container": "#10b981",
+              "on-primary-fixed-variant": "#005236",
+              "outline": "#86948a",
+              "tertiary-fixed": "#ffdadb",
+              "on-primary": "#003824",
+              "secondary-fixed": "#d8e2ff",
+              "outline-variant": "#3c4a42",
+              "on-secondary-container": "#e6ecff",
+              "on-secondary-fixed": "#001a42",
+              "on-primary-fixed": "#002113",
+              "primary-fixed": "#6ffbbe",
+              "tertiary-container": "#ff7886",
+              "surface-tint": "#4edea3",
+              "surface-container-high": "#2a2a2d",
+              "surface-container-lowest": "#0e0e11",
+              "secondary-container": "#0566d9",
+              "on-background": "#e4e1e6",
+              "primary-fixed-dim": "#4edea3",
+              "on-tertiary-fixed-variant": "#92002a",
+              "surface-bright": "#39393c",
+              "on-secondary": "#002e6a",
+              "background": "#131316"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body min-h-screen pb-32 md:pb-0 md:pt-20 selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-6 h-16 w-full fixed top-0 z-50 bg-[#131316]">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="close-up portrait of a professional male avatar with short dark hair and a clean minimalist aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6a5NQRYoaF3ZsIq1fpgi0Bzq1Ov9E0v1XM4r-JEg4jws5j0DSaGayOqAlJEmVGRE68vxewBYHKMcxGwJncXoBxRn3x_LleJjd2Dxv4AriuJsNwUua7lDSoBzJtPD4nq1d5hOh1HzKZsNTmr8-BO-0mw6-aEICMpMUwEXAijhWyUvITd4OspKOxJBf2jz_EF9yQLtU9I0fmGgekZg9f69XMXDc01OGluk4PxpDadCveehulENLAVn6D3co8_de6vAwmF3GaKb7lNC8"/>
+</div>
+<span class="text-xl font-black text-white tracking-tighter uppercase font-headline">FinansTakip</span>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<nav class="flex gap-6 font-label text-sm font-semibold">
+<a class="text-gray-400 hover:text-white transition-colors" href="#">Dashboard</a>
+<a class="text-gray-400 hover:text-white transition-colors" href="#">İşlemler</a>
+<a class="text-[#10b981]" href="#">Yatırımlar</a>
+<a class="text-gray-400 hover:text-white transition-colors" href="#">Hedefler</a>
+<a class="text-gray-400 hover:text-white transition-colors" href="#">Bütçeler</a>
+</nav>
+<button class="material-symbols-outlined text-gray-400 hover:bg-[#1F1F22] p-2 rounded-full transition-colors" data-icon="notifications">notifications</button>
+</div>
+<div class="md:hidden">
+<button class="material-symbols-outlined text-[#10b981]" data-icon="notifications">notifications</button>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-6 pt-24 pb-12">
+<!-- Dashboard Header / Overview -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+<div class="lg:col-span-8 flex flex-col justify-end">
+<h1 class="text-4xl md:text-5xl font-black tracking-tighter uppercase mb-2">Yatırımlar</h1>
+<p class="font-label text-on-surface-variant max-w-xl">Portföyünüzün gerçek zamanlı performansı ve varlık dağılım analizi. Veriler anlık olarak güncellenmektedir.</p>
+</div>
+<div class="lg:col-span-4 bg-primary-container p-6 rounded-3xl flex flex-col justify-between shadow-[0_20px_40px_rgba(16,185,129,0.15)]">
+<div class="flex justify-between items-start">
+<span class="font-label text-xs font-bold uppercase tracking-widest text-on-primary-container/70">Toplam Varlık Değeri</span>
+<span class="material-symbols-outlined text-on-primary-container" data-icon="account_balance">account_balance</span>
+</div>
+<div class="mt-4">
+<div class="text-4xl font-black tracking-tighter text-on-primary-container">₺1,248,450.00</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold text-on-primary-container">+12.4%</span>
+<span class="text-[10px] font-medium text-on-primary-container/80 font-label">Bugün: +₺14,200</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+<!-- Portfolio Allocation Chart (Asymmetric) -->
+<div class="lg:col-span-5 bg-surface-container-low rounded-3xl p-8 relative overflow-hidden flex flex-col justify-between min-h-[400px]">
+<div>
+<h3 class="font-headline font-black text-xl mb-1 tracking-tight">VARLIK DAĞILIMI</h3>
+<p class="font-label text-xs text-on-surface-variant">Sektörel bazlı ağırlıklandırma</p>
+</div>
+<div class="flex items-center justify-center py-8">
+<!-- Simple SVG representation of a Donut Chart -->
+<div class="relative w-48 h-48">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 36 36">
+<circle class="text-surface-container-highest" cx="18" cy="18" fill="none" r="15.915" stroke="currentColor" stroke-width="3"></circle>
+<circle class="text-primary" cx="18" cy="18" fill="none" r="15.915" stroke="currentColor" stroke-dasharray="45 55" stroke-dashoffset="0" stroke-width="3.5"></circle>
+<circle class="text-secondary" cx="18" cy="18" fill="none" r="15.915" stroke="currentColor" stroke-dasharray="30 70" stroke-dashoffset="-45" stroke-width="3.5"></circle>
+<circle class="text-tertiary" cx="18" cy="18" fill="none" r="15.915" stroke="currentColor" stroke-dasharray="25 75" stroke-dashoffset="-75" stroke-width="3.5"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-label text-[10px] uppercase font-bold text-on-surface-variant">Çeşitlilik</span>
+<span class="font-headline font-black text-2xl">High</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-4 border-t border-outline-variant/10 pt-6">
+<div>
+<div class="flex items-center gap-1.5 mb-1">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+<span class="text-[10px] font-bold uppercase font-label">Borsa</span>
+</div>
+<div class="font-headline font-bold text-lg">45%</div>
+</div>
+<div>
+<div class="flex items-center gap-1.5 mb-1">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+<span class="text-[10px] font-bold uppercase font-label">Kripto</span>
+</div>
+<div class="font-headline font-bold text-lg">30%</div>
+</div>
+<div>
+<div class="flex items-center gap-1.5 mb-1">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="text-[10px] font-bold uppercase font-label">Altın</span>
+</div>
+<div class="font-headline font-bold text-lg">25%</div>
+</div>
+</div>
+</div>
+<!-- Asset List - Terminal style High Density -->
+<div class="lg:col-span-7 bg-surface-container-low rounded-3xl p-2 flex flex-col overflow-hidden">
+<div class="p-6 pb-2 flex justify-between items-center">
+<h3 class="font-headline font-black text-xl tracking-tight">AKTİF POZİSYONLAR</h3>
+<div class="flex gap-2">
+<button class="bg-surface-container hover:bg-surface-container-high p-2 rounded-xl transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="filter_list">filter_list</span>
+</button>
+<button class="bg-primary/10 text-primary px-4 py-2 rounded-full text-xs font-bold font-label hover:bg-primary/20 transition-all">+ YENİ EKLE</button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto hide-scrollbar">
+<table class="w-full text-left border-separate border-spacing-y-2 px-4">
+<thead class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
+<tr>
+<th class="pb-2 pl-4">VARLIK</th>
+<th class="pb-2">MİKTAR</th>
+<th class="pb-2">MALİYET</th>
+<th class="pb-2">FİYAT</th>
+<th class="pb-2 pr-4 text-right">DEĞİŞİM</th>
+</tr>
+</thead>
+<tbody class="font-label text-sm">
+<tr class="bg-surface-container/40 hover:bg-surface-container transition-colors group">
+<td class="py-4 pl-4 rounded-l-2xl">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-primary">BTC</div>
+<div>
+<div class="font-bold text-white">Bitcoin</div>
+<div class="text-[10px] text-on-surface-variant">Kripto Para</div>
+</div>
+</div>
+</td>
+<td>0.42 BTC</td>
+<td>$28,450</td>
+<td>$64,120</td>
+<td class="pr-4 rounded-r-2xl text-right">
+<div class="text-primary font-bold">+125.4%</div>
+<div class="text-[10px] text-primary/60">+$14,981</div>
+</td>
+</tr>
+<tr class="bg-surface-container-lowest hover:bg-surface-container transition-colors group">
+<td class="py-4 pl-4 rounded-l-2xl">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-secondary">AAPL</div>
+<div>
+<div class="font-bold text-white">Apple Inc.</div>
+<div class="text-[10px] text-on-surface-variant">Nasdaq</div>
+</div>
+</div>
+</td>
+<td>45 Lot</td>
+<td>$142.10</td>
+<td>$189.45</td>
+<td class="pr-4 rounded-r-2xl text-right">
+<div class="text-primary font-bold">+33.3%</div>
+<div class="text-[10px] text-primary/60">+$2,130</div>
+</td>
+</tr>
+<tr class="bg-surface-container/40 hover:bg-surface-container transition-colors group">
+<td class="py-4 pl-4 rounded-l-2xl">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-tertiary">AU</div>
+<div>
+<div class="font-bold text-white">Gram Altın</div>
+<div class="text-[10px] text-on-surface-variant">Emtia</div>
+</div>
+</div>
+</td>
+<td>250 gr</td>
+<td>₺1,150</td>
+<td>₺2,450</td>
+<td class="pr-4 rounded-r-2xl text-right">
+<div class="text-primary font-bold">+113.0%</div>
+<div class="text-[10px] text-primary/60">+₺325,000</div>
+</td>
+</tr>
+<tr class="bg-surface-container-lowest hover:bg-surface-container transition-colors group">
+<td class="py-4 pl-4 rounded-l-2xl">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center font-bold text-red-400">ETH</div>
+<div>
+<div class="font-bold text-white">Ethereum</div>
+<div class="text-[10px] text-on-surface-variant">Kripto Para</div>
+</div>
+</div>
+</td>
+<td>4.5 ETH</td>
+<td>$3,850</td>
+<td>$3,420</td>
+<td class="pr-4 rounded-r-2xl text-right">
+<div class="text-error font-bold">-11.2%</div>
+<div class="text-[10px] text-error/60">-$1,935</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Market Watch - Micro Bento -->
+<div class="md:col-span-1 lg:col-span-4 bg-surface-container-low rounded-3xl p-6 flex flex-col justify-between">
+<div class="flex justify-between items-start mb-6">
+<div>
+<h4 class="font-headline font-black text-sm tracking-widest uppercase">Piyasa Takibi</h4>
+<p class="text-[10px] font-label text-on-surface-variant">Global Endeksler</p>
+</div>
+<span class="material-symbols-outlined text-primary text-xl" data-icon="monitoring">monitoring</span>
+</div>
+<div class="space-y-4">
+<div class="flex justify-between items-center p-3 rounded-2xl bg-surface-container-lowest">
+<span class="font-bold text-xs">S&amp;P 500</span>
+<div class="text-right">
+<div class="text-xs font-black">5,224.62</div>
+<div class="text-[10px] text-primary">+0.82%</div>
+</div>
+</div>
+<div class="flex justify-between items-center p-3 rounded-2xl bg-surface-container-lowest">
+<span class="font-bold text-xs">NASDAQ</span>
+<div class="text-right">
+<div class="text-xs font-black">16,384.47</div>
+<div class="text-[10px] text-primary">+1.14%</div>
+</div>
+</div>
+<div class="flex justify-between items-center p-3 rounded-2xl bg-surface-container-lowest">
+<span class="font-bold text-xs">USD / TRY</span>
+<div class="text-right">
+<div class="text-xs font-black">32.42</div>
+<div class="text-[10px] text-error">-0.05%</div>
+</div>
+</div>
+</div>
+<div class="mt-6 pt-6 border-t border-outline-variant/10">
+<div class="flex items-center gap-2 mb-2">
+<div class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+<span class="text-[10px] font-bold uppercase tracking-widest opacity-60">Canlı Veri Akışı</span>
+</div>
+<p class="text-[10px] leading-relaxed text-on-surface-variant">Fed faiz kararı öncesi piyasalarda volatilite bekleniyor. Kripto varlıklarda konsolidasyon devam ediyor.</p>
+</div>
+</div>
+<!-- Dividend / Passive Income Card -->
+<div class="md:col-span-1 lg:col-span-4 bg-surface-container-low rounded-3xl p-6 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-4">
+<h4 class="font-headline font-black text-sm tracking-widest uppercase">Temettü Verimi</h4>
+<span class="material-symbols-outlined text-secondary" data-icon="payments">payments</span>
+</div>
+<div class="text-3xl font-black tracking-tighter mb-1">₺12,450.00</div>
+<p class="text-[10px] font-label text-on-surface-variant uppercase">Yıllık Tahmini Pasif Gelir</p>
+</div>
+<div class="mt-8 bg-surface-container-lowest p-4 rounded-2xl border-l-4 border-secondary">
+<div class="text-[10px] font-bold text-secondary uppercase mb-1">Sıradaki Ödeme</div>
+<div class="flex justify-between items-end">
+<div class="font-headline font-bold">EREGL</div>
+<div class="text-right">
+<div class="text-xs font-bold">15 May</div>
+<div class="text-[10px] text-on-surface-variant">₺1,420</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Risk Analysis Card -->
+<div class="md:col-span-1 lg:col-span-4 bg-[#1F1F22] rounded-3xl p-6 border border-white/5 flex flex-col">
+<h4 class="font-headline font-black text-sm tracking-widest uppercase mb-6">Risk Analizi</h4>
+<div class="flex-1 flex flex-col justify-center gap-6">
+<div>
+<div class="flex justify-between text-[10px] font-bold mb-2">
+<span>PORTFÖY VOLATİLİTESİ</span>
+<span class="text-primary">DÜŞÜK</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-1/3 rounded-full"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[10px] font-bold mb-2">
+<span>VARLIK KORELASYONU</span>
+<span class="text-secondary">ORTA</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-1/2 rounded-full"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[10px] font-bold mb-2">
+<span>LİKİDİTE SKORU</span>
+<span class="text-tertiary">YÜKSEK</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-4/5 rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#131316]/80 backdrop-blur-xl border-t border-white/5 md:hidden">
+<a class="flex flex-col items-center justify-center text-gray-500 hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="dashboard">dashboard</span>
+<span class="font-['Manrope'] text-[10px] font-medium tracking-wide mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gray-500 hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="receipt_long">receipt_long</span>
+<span class="font-['Manrope'] text-[10px] font-medium tracking-wide mt-1">İşlemler</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#10b981] bg-[#10b981]/10 rounded-2xl px-3 py-1" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="trending_up">trending_up</span>
+<span class="font-['Manrope'] text-[10px] font-medium tracking-wide mt-1">Yatırımlar</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gray-500 hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="ads_click">ads_click</span>
+<span class="font-['Manrope'] text-[10px] font-medium tracking-wide mt-1">Hedefler</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gray-500 hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-['Manrope'] text-[10px] font-medium tracking-wide mt-1">Bütçeler</span>
+</a>
+</nav>
+</body></html>

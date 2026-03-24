@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary-fixed-variant": "#92002a",
+              "on-primary-fixed-variant": "#005236",
+              "secondary-fixed-dim": "#adc6ff",
+              "outline": "#86948a",
+              "secondary": "#adc6ff",
+              "surface": "#131316",
+              "tertiary-container": "#ff7886",
+              "tertiary": "#ffb2b7",
+              "on-secondary-fixed": "#001a42",
+              "on-error-container": "#ffdad6",
+              "on-error": "#690005",
+              "primary": "#4edea3",
+              "on-secondary-fixed-variant": "#004395",
+              "inverse-surface": "#e4e1e6",
+              "on-primary-container": "#00422b",
+              "surface-variant": "#353438",
+              "surface-container": "#1f1f22",
+              "secondary-container": "#0566d9",
+              "surface-dim": "#131316",
+              "on-primary": "#003824",
+              "outline-variant": "#3c4a42",
+              "inverse-on-surface": "#303033",
+              "on-surface": "#e4e1e6",
+              "surface-container-high": "#2a2a2d",
+              "surface-container-lowest": "#0e0e11",
+              "on-background": "#e4e1e6",
+              "inverse-primary": "#006c49",
+              "surface-tint": "#4edea3",
+              "on-secondary-container": "#e6ecff",
+              "surface-container-highest": "#353438",
+              "secondary-fixed": "#d8e2ff",
+              "on-tertiary-container": "#780021",
+              "error": "#ffb4ab",
+              "primary-fixed": "#6ffbbe",
+              "primary-container": "#10b981",
+              "error-container": "#93000a",
+              "on-secondary": "#002e6a",
+              "on-tertiary": "#67001b",
+              "on-primary-fixed": "#002113",
+              "background": "#131316",
+              "tertiary-fixed-dim": "#ffb2b7",
+              "on-surface-variant": "#bbcabf",
+              "primary-fixed-dim": "#4edea3",
+              "on-tertiary-fixed": "#40000d",
+              "tertiary-fixed": "#ffdadb",
+              "surface-container-low": "#1b1b1e",
+              "surface-bright": "#39393c"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-card {
+        background: rgba(31, 31, 34, 0.6);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+      }
+      ::-webkit-scrollbar { width: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #3c4a42; border-radius: 10px; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30 min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="bg-[#131316] sticky top-0 z-50 flex justify-between items-center w-full px-6 h-16">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center overflow-hidden border border-white/5">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="professional headshot of a young financial analyst with soft studio lighting and a neutral dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjxLkrgZjDJBay3DyY3FOWafI2ykDksVFab6xnHM1A8GBykzNltDnVCTcnfINjkXAk7UQCj2Jg6WAD_T_iDXmcRgQyRztKt_UWLkrNZ7U_aIzIhTAzvtR2U8fdwuHMTnCiQbAEQY0ABgcsFMIJza_yytrGGwd34hJOe2u7ho_ZksNk4RHla7CEELgIIay5VNkhBX7KC4HOvT73CVpk3BFeMEdDQBPE6EEYPb5zKWdyW8xXDdWMX2Do5ho4sABWRodS96K3uiG9KLF5"/>
+</div>
+<span class="text-xl font-black text-emerald-500 tracking-tighter font-headline">FinansTakip</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined text-slate-400">notifications</span>
+</button>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-6 py-8">
+<!-- Dashboard Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
+<div>
+<h1 class="text-4xl font-black font-headline tracking-tighter mb-2">Bütçeler</h1>
+<p class="text-on-surface-variant font-label text-sm">Eylül 2024 Dönemi Analizi</p>
+</div>
+<div class="flex gap-3">
+<button class="bg-surface-container-low px-6 py-3 rounded-full font-label font-bold text-sm hover:bg-surface-container transition-all active:scale-95 border border-white/5">
+                    Raporu İndir
+                </button>
+<button class="bg-gradient-to-br from-primary-container to-primary px-6 py-3 rounded-full font-label font-bold text-sm text-on-primary hover:opacity-90 transition-all active:scale-95 shadow-lg shadow-primary/20">
+                    Yeni Bütçe Ekle
+                </button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Overall Status Card -->
+<div class="md:col-span-4 bg-surface-container-low p-8 rounded-3xl flex flex-col justify-between relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl group-hover:bg-primary/10 transition-all"></div>
+<div>
+<span class="text-on-surface-variant font-label text-xs uppercase tracking-widest font-bold">Toplam Kullanım</span>
+<div class="mt-4 flex items-baseline gap-2">
+<span class="text-5xl font-black font-headline tracking-tighter">₺12,450</span>
+<span class="text-primary font-label font-bold text-sm">/ ₺20,000</span>
+</div>
+</div>
+<div class="mt-8">
+<div class="h-4 w-full bg-surface-container-lowest rounded-full overflow-hidden flex">
+<div class="h-full bg-gradient-to-r from-primary-container to-primary" style="width: 62%;"></div>
+</div>
+<div class="flex justify-between mt-3">
+<span class="text-xs font-label text-on-surface-variant">Kalan: ₺7,550</span>
+<span class="text-xs font-label text-primary font-bold">%62 Doluluk</span>
+</div>
+</div>
+</div>
+<!-- Spending Trend Chart (Simulated) -->
+<div class="md:col-span-8 bg-surface-container-low p-8 rounded-3xl border border-transparent hover:border-white/5 transition-all">
+<div class="flex justify-between items-start mb-8">
+<div>
+<h3 class="text-lg font-bold font-headline">Harcama Trendi</h3>
+<p class="text-xs text-on-surface-variant font-label">Son 6 Aylık Karşılaştırma</p>
+</div>
+<div class="flex gap-2">
+<div class="flex items-center gap-2 text-[10px] font-label font-bold uppercase tracking-tighter">
+<span class="w-2 h-2 rounded-full bg-secondary">Gelir</span>
+</div>
+<div class="flex items-center gap-2 text-[10px] font-label font-bold uppercase tracking-tighter">
+<span class="w-2 h-2 rounded-full bg-tertiary">Gider</span>
+</div>
+</div>
+</div>
+<!-- Mock Chart Area -->
+<div class="h-48 w-full flex items-end gap-4 px-2">
+<div class="flex-1 flex flex-col gap-1 items-center">
+<div class="w-full flex gap-1 items-end h-full">
+<div class="flex-1 bg-secondary/20 h-[60%] rounded-t-lg relative group">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-surface-container-high px-2 py-1 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">₺15k</div>
+</div>
+<div class="flex-1 bg-tertiary/20 h-[45%] rounded-t-lg"></div>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant mt-2">Nis</span>
+</div>
+<div class="flex-1 flex flex-col gap-1 items-center">
+<div class="w-full flex gap-1 items-end h-full">
+<div class="flex-1 bg-secondary/20 h-[75%] rounded-t-lg"></div>
+<div class="flex-1 bg-tertiary/20 h-[55%] rounded-t-lg"></div>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant mt-2">May</span>
+</div>
+<div class="flex-1 flex flex-col gap-1 items-center">
+<div class="w-full flex gap-1 items-end h-full">
+<div class="flex-1 bg-secondary/20 h-[85%] rounded-t-lg"></div>
+<div class="flex-1 bg-tertiary/20 h-[40%] rounded-t-lg"></div>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant mt-2">Haz</span>
+</div>
+<div class="flex-1 flex flex-col gap-1 items-center">
+<div class="w-full flex gap-1 items-end h-full">
+<div class="flex-1 bg-secondary/20 h-[95%] rounded-t-lg"></div>
+<div class="flex-1 bg-tertiary/20 h-[65%] rounded-t-lg"></div>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant mt-2">Tem</span>
+</div>
+<div class="flex-1 flex flex-col gap-1 items-center">
+<div class="w-full flex gap-1 items-end h-full">
+<div class="flex-1 bg-secondary/20 h-[80%] rounded-t-lg"></div>
+<div class="flex-1 bg-tertiary/20 h-[70%] rounded-t-lg"></div>
+</div>
+<span class="text-[10px] font-label text-on-surface-variant mt-2">Ağu</span>
+</div>
+<div class="flex-1 flex flex-col gap-1 items-center">
+<div class="w-full flex gap-1 items-end h-full">
+<div class="flex-1 bg-secondary-container h-[90%] rounded-t-lg border-x-2 border-t-2 border-secondary/50"></div>
+<div class="flex-1 bg-tertiary-container h-[62%] rounded-t-lg border-x-2 border-t-2 border-tertiary/50"></div>
+</div>
+<span class="text-[10px] font-label text-primary font-bold mt-2">Eyl</span>
+</div>
+</div>
+</div>
+<!-- Categories List -->
+<div class="md:col-span-12">
+<h2 class="text-2xl font-black font-headline tracking-tight mb-6">Kategori Detayları</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Category Card 1 -->
+<div class="bg-surface-container-low hover:bg-surface-container p-6 rounded-3xl transition-all duration-300 group">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-2xl bg-surface-container-lowest flex items-center justify-center text-primary border border-white/5">
+<span class="material-symbols-outlined">restaurant</span>
+</div>
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<div class="mb-6">
+<h4 class="text-lg font-bold font-headline mb-1">Mutfak &amp; Market</h4>
+<p class="text-xs text-on-surface-variant font-label">Aylık Limit: ₺4,500</p>
+</div>
+<div class="space-y-4">
+<div class="flex justify-between items-end">
+<span class="text-2xl font-black font-headline tracking-tighter">₺3,240</span>
+<span class="text-xs font-label text-error font-bold">%72 Kullanıldı</span>
+</div>
+<div class="h-2 w-full bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary" style="width: 72%;"></div>
+</div>
+</div>
+</div>
+<!-- Category Card 2 -->
+<div class="bg-surface-container-low hover:bg-surface-container p-6 rounded-3xl transition-all duration-300">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-2xl bg-surface-container-lowest flex items-center justify-center text-primary border border-white/5">
+<span class="material-symbols-outlined">directions_car</span>
+</div>
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<div class="mb-6">
+<h4 class="text-lg font-bold font-headline mb-1">Ulaşım</h4>
+<p class="text-xs text-on-surface-variant font-label">Aylık Limit: ₺2,000</p>
+</div>
+<div class="space-y-4">
+<div class="flex justify-between items-end">
+<span class="text-2xl font-black font-headline tracking-tighter">₺850</span>
+<span class="text-xs font-label text-primary font-bold">%42 Kullanıldı</span>
+</div>
+<div class="h-2 w-full bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-primary" style="width: 42%;"></div>
+</div>
+</div>
+</div>
+<!-- Category Card 3 -->
+<div class="bg-surface-container-low hover:bg-surface-container p-6 rounded-3xl transition-all duration-300">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-2xl bg-surface-container-lowest flex items-center justify-center text-primary border border-white/5">
+<span class="material-symbols-outlined">bolt</span>
+</div>
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<div class="mb-6">
+<h4 class="text-lg font-bold font-headline mb-1">Faturalar</h4>
+<p class="text-xs text-on-surface-variant font-label">Aylık Limit: ₺3,500</p>
+</div>
+<div class="space-y-4">
+<div class="flex justify-between items-end">
+<span class="text-2xl font-black font-headline tracking-tighter">₺3,450</span>
+<span class="text-xs font-label text-error font-bold">%98 Kritik</span>
+</div>
+<div class="h-2 w-full bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-error" style="width: 98%;"></div>
+</div>
+</div>
+</div>
+<!-- Add New Category Placeholder -->
+<div class="bg-surface-container-lowest border-2 border-dashed border-white/5 hover:border-primary/30 p-6 rounded-3xl transition-all duration-300 flex flex-col items-center justify-center text-on-surface-variant group cursor-pointer h-full min-h-[220px]">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center mb-4 group-hover:bg-primary/10 group-hover:text-primary transition-all">
+<span class="material-symbols-outlined">add</span>
+</div>
+<p class="font-label font-bold text-sm">Yeni Kategori Tanımla</p>
+</div>
+</div>
+</div>
+<!-- Spending Insights Section -->
+<div class="md:col-span-12 mt-10">
+<div class="bg-surface-container-low p-10 rounded-3xl relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-50"></div>
+<div class="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+<div>
+<span class="inline-block bg-primary/20 text-primary text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full mb-6">Akıllı Analiz</span>
+<h2 class="text-3xl font-black font-headline tracking-tighter mb-4 leading-tight">Gelecek ay ₺1,200 tasarruf edebilirsiniz.</h2>
+<p class="text-on-surface-variant font-label mb-8 leading-relaxed">Analizlerimiz, eğlence ve dışarıda yemek harcamalarınızın son 3 ayda %24 arttığını gösteriyor. Bu kategorilerde bütçenize sadık kalarak birikim hedefinize 2 ay daha erken ulaşabilirsiniz.</p>
+<button class="bg-white text-surface px-8 py-4 rounded-full font-bold text-sm hover:bg-primary-container hover:text-on-primary-container transition-all">Detaylı Analizi Gör</button>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container rounded-2xl p-6 border border-white/5">
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-2">En Çok Harcama</p>
+<p class="text-xl font-black font-headline">Mutfak</p>
+<p class="text-xs text-primary font-bold mt-1">₺3.2k</p>
+</div>
+<div class="bg-surface-container rounded-2xl p-6 border border-white/5">
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-2">Aylık Ortalama</p>
+<p class="text-xl font-black font-headline">₺11.8k</p>
+<p class="text-xs text-secondary font-bold mt-1">Dengeli</p>
+</div>
+<div class="bg-surface-container rounded-2xl p-6 border border-white/5">
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-2">Harcama Sayısı</p>
+<p class="text-xl font-black font-headline">142</p>
+<p class="text-xs text-on-surface-variant mt-1">Eylül ayı</p>
+</div>
+<div class="bg-surface-container rounded-2xl p-6 border border-white/5">
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-2">Limit Aşımı</p>
+<p class="text-xl font-black font-headline">0</p>
+<p class="text-xs text-primary font-bold mt-1">Tebrikler!</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#131316]/80 backdrop-blur-xl border-t border-white/5 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] rounded-t-[2rem]">
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-400 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">dashboard</span>
+<span class="font-['Manrope'] text-[10px] font-medium">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-400 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">receipt_long</span>
+<span class="font-['Manrope'] text-[10px] font-medium">Transactions</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-400 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">trending_up</span>
+<span class="font-['Manrope'] text-[10px] font-medium">Investments</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-400 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">target</span>
+<span class="font-['Manrope'] text-[10px] font-medium">Goals</span>
+</a>
+<a class="flex flex-col items-center justify-center text-emerald-500 font-bold bg-emerald-500/10 rounded-2xl px-3 py-1 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">account_balance_wallet</span>
+<span class="font-['Manrope'] text-[10px] font-medium">Budgets</span>
+</a>
+</nav>
+</body></html>

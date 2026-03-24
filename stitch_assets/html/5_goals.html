@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&amp;family=Manrope:wght@400;500;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-tertiary-fixed-variant": "#92002a",
+            "on-primary-fixed-variant": "#005236",
+            "secondary-fixed-dim": "#adc6ff",
+            "outline": "#86948a",
+            "secondary": "#adc6ff",
+            "surface": "#131316",
+            "tertiary-container": "#ff7886",
+            "tertiary": "#ffb2b7",
+            "on-secondary-fixed": "#001a42",
+            "on-error-container": "#ffdad6",
+            "on-error": "#690005",
+            "primary": "#4edea3",
+            "on-secondary-fixed-variant": "#004395",
+            "inverse-surface": "#e4e1e6",
+            "on-primary-container": "#00422b",
+            "surface-variant": "#353438",
+            "surface-container": "#1f1f22",
+            "secondary-container": "#0566d9",
+            "surface-dim": "#131316",
+            "on-primary": "#003824",
+            "outline-variant": "#3c4a42",
+            "inverse-on-surface": "#303033",
+            "on-surface": "#e4e1e6",
+            "surface-container-high": "#2a2a2d",
+            "surface-container-lowest": "#0e0e11",
+            "on-background": "#e4e1e6",
+            "inverse-primary": "#006c49",
+            "surface-tint": "#4edea3",
+            "on-secondary-container": "#e6ecff",
+            "surface-container-highest": "#353438",
+            "secondary-fixed": "#d8e2ff",
+            "on-tertiary-container": "#780021",
+            "error": "#ffb4ab",
+            "primary-fixed": "#6ffbbe",
+            "primary-container": "#10b981",
+            "error-container": "#93000a",
+            "on-secondary": "#002e6a",
+            "on-tertiary": "#67001b",
+            "on-primary-fixed": "#002113",
+            "background": "#131316",
+            "tertiary-fixed-dim": "#ffb2b7",
+            "on-surface-variant": "#bbcabf",
+            "primary-fixed-dim": "#4edea3",
+            "on-tertiary-fixed": "#40000d",
+            "tertiary-fixed": "#ffdadb",
+            "surface-container-low": "#1b1b1e",
+            "surface-bright": "#39393c"
+          },
+          fontFamily: {
+            "headline": ["Inter"],
+            "body": ["Inter"],
+            "label": ["Manrope"]
+          },
+          borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30 no-scrollbar">
+<!-- TopAppBar -->
+<header class="bg-[#131316] dark:bg-[#131316] docked full-width top-0 z-50 sticky">
+<div class="flex justify-between items-center w-full px-6 h-16 bg-[#1B1B1E] flat no shadows">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center overflow-hidden border border-white/5">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="professional male portrait with minimalist background, soft cinematic lighting, high quality digital art" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA-t34qCRfEurwuuHV-m368UbZBHeEUw2iN8kfLjp8tgwz6hRYihpKbmLjxnIC4XMGZbWkQRJ74yN1Q5LoEKO5HbtZyDiSmVL2d8KJsAzCUx47-fPrUP1Dj1dPRvtHLvYO2kPMlTqu4Gmdg9OkXYqHa6-WVDYu90OHPeldG-EIBjHz4t4aAcvzIkQ5EHUlqfmiEnedfEtE6JmEIyPqRy0QcKexsBwl7xQDISm9m9CrWjdwGmwGc-UOI5UHcCbNbQDP8Uyo8lPu3lwRf"/>
+</div>
+<span class="text-xl font-black text-emerald-500 tracking-tighter font-['Inter']">FinansTakip</span>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined text-slate-400">notifications</span>
+</button>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-6 pt-8 pb-32">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+<div>
+<h1 class="text-4xl md:text-5xl font-black tracking-tighter text-on-surface mb-2">Hedefler</h1>
+<p class="text-on-surface-variant font-label text-sm uppercase tracking-widest font-bold">Financial Milestones &amp; Savings</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-low p-4 rounded-3xl flex flex-col items-end">
+<span class="text-xs font-label text-on-surface-variant font-medium">Toplam Hedef Birikimi</span>
+<span class="text-2xl font-black text-primary font-headline tracking-tight">₺142.850,00</span>
+</div>
+<button class="bg-gradient-to-br from-primary-container to-primary text-on-primary font-bold px-6 py-4 rounded-full flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-primary/10">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+          Yeni Hedef
+        </button>
+</div>
+</div>
+<!-- Bento Grid Content -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Featured Goal Card (Large) -->
+<div class="md:col-span-8 bg-surface-container-low rounded-3xl p-8 relative overflow-hidden group hover:bg-surface-container transition-colors duration-500">
+<div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-12">
+<div class="flex items-center gap-4">
+<div class="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">home</span>
+</div>
+<div>
+<h3 class="text-2xl font-black font-headline leading-tight">Yeni Ev Peşinatı</h3>
+<span class="text-sm font-label text-on-surface-variant">Konut Birikim Hesabı</span>
+</div>
+</div>
+<div class="text-right">
+<div class="text-3xl font-black text-on-surface tracking-tighter">₺75.000 <span class="text-lg text-on-surface-variant">/ ₺250.000</span></div>
+<div class="bg-primary/20 text-primary px-3 py-1 rounded-full text-xs font-bold inline-block mt-2">30% Tamamlandı</div>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="mb-8">
+<div class="w-full h-4 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary-container to-primary w-[30%] rounded-full relative">
+<div class="absolute right-0 top-0 bottom-0 w-2 bg-white/20"></div>
+</div>
+</div>
+<div class="flex justify-between mt-4 text-xs font-label font-bold text-on-surface-variant tracking-wider uppercase">
+<span>Başlangıç: ₺0</span>
+<span>Kalan: ₺175.000</span>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<div class="bg-surface-container-lowest p-4 rounded-2xl">
+<span class="text-[10px] text-on-surface-variant font-label font-bold block mb-1">AYLIK TASARRUF</span>
+<span class="text-lg font-black text-on-surface">₺8.500</span>
+</div>
+<div class="bg-surface-container-lowest p-4 rounded-2xl">
+<span class="text-[10px] text-on-surface-variant font-label font-bold block mb-1">KALAN SÜRE</span>
+<span class="text-lg font-black text-on-surface">21 Ay</span>
+</div>
+<div class="bg-surface-container-lowest p-4 rounded-2xl">
+<span class="text-[10px] text-on-surface-variant font-label font-bold block mb-1">SON KATKI</span>
+<span class="text-lg font-black text-primary">+₺2.400</span>
+</div>
+<div class="bg-surface-container-lowest p-4 rounded-2xl flex items-center justify-center">
+<button class="text-primary font-bold text-sm hover:underline">Detaylar</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Stats Card (Small) -->
+<div class="md:col-span-4 bg-surface-container-low rounded-3xl p-6 flex flex-col justify-between border border-transparent hover:bg-surface-container transition-all">
+<div>
+<h4 class="font-black text-lg mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">trending_up</span>
+            Motivasyon
+          </h4>
+<p class="text-on-surface-variant font-label text-sm leading-relaxed mb-6">
+            Geçen aya göre birikim hızınız <span class="text-primary font-bold">%12 arttı</span>. Bu hızla devam ederseniz "Tatil Fonu" hedefinize 2 ay erken ulaşacaksınız.
+          </p>
+</div>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded-2xl">
+<span class="text-xs font-label text-on-surface-variant">Başarı Oranı</span>
+<span class="font-black text-on-surface">88/100</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded-2xl">
+<span class="text-xs font-label text-on-surface-variant">Aktif Hedefler</span>
+<span class="font-black text-on-surface">4 Adet</span>
+</div>
+</div>
+</div>
+<!-- Secondary Goal (Medium) -->
+<div class="md:col-span-4 bg-surface-container-low rounded-3xl p-6 group">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">flight</span>
+</div>
+<h4 class="font-black">Avrupa Turu</h4>
+</div>
+<div class="mb-4">
+<div class="flex justify-between text-xs font-label mb-2">
+<span class="text-on-surface-variant">₺42.000 / ₺60.000</span>
+<span class="text-primary font-bold">70%</span>
+</div>
+<div class="w-full h-2 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[70%] rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-xs font-label text-on-surface-variant">Hedef: Ağustos 2024</span>
+<span class="text-xs font-black text-on-surface">114 Gün Kaldı</span>
+</div>
+</div>
+<!-- Quick Savings (Small) -->
+<div class="md:col-span-4 bg-surface-container-low rounded-3xl p-6 flex flex-col justify-center items-center text-center gap-4 group">
+<div class="w-12 h-12 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</div>
+<div>
+<h4 class="font-black text-sm">Hızlı Birikim</h4>
+<p class="text-xs text-on-surface-variant mt-1">Küsüratları "Ev Peşinatı" hedefine yuvarla.</p>
+</div>
+<button class="w-full py-3 rounded-2xl bg-surface-container-lowest font-bold text-xs hover:bg-surface-bright transition-colors">Aktifleştir</button>
+</div>
+<!-- Tertiary Goal (Medium) -->
+<div class="md:col-span-4 bg-surface-container-low rounded-3xl p-6 group">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 rounded-xl bg-tertiary/10 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">directions_car</span>
+</div>
+<h4 class="font-black">Elektrikli Araç</h4>
+</div>
+<div class="mb-4">
+<div class="flex justify-between text-xs font-label mb-2">
+<span class="text-on-surface-variant">₺25.850 / ₺1.200.000</span>
+<span class="text-on-surface-variant font-bold">2%</span>
+</div>
+<div class="w-full h-2 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-[2%] rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-xs font-label text-on-surface-variant">Hedef: 2026</span>
+<span class="text-xs font-black text-on-surface">Uzun Vadeli</span>
+</div>
+</div>
+<!-- Inspiration Section (Wide) -->
+<div class="md:col-span-12 bg-surface-container-lowest rounded-3xl p-8 flex flex-col md:flex-row items-center gap-8 border border-white/5">
+<div class="w-full md:w-1/3 aspect-video rounded-2xl overflow-hidden grayscale hover:grayscale-0 transition-all duration-700">
+<img class="w-full h-full object-cover" data-alt="close-up of young plant growing from a stack of gold coins on dark background, symbolic of financial growth and investment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTAg4bMXKt7P0zkvF7V0cDEiraCMKag00Wf0cWjmKtKCrHPZ5StenoR9XSCE4r5VK1ufJ35S0eLy6nSFn1fhb18B6mwrsVl9f3vSk3RI6P5-X6nvJ_1nTFvrv1l47_bF9A1Y29q1GeYsYMX6AFo9Wn8URKYCZAHB3-uQCD7EbL4SLHk-PetLNbiJ6DqqKqu6V9RoN7Jg1ElHN4oidt0H8auFYvipxYfbFdmeQWj0HZLdWo5atSpeN262GTfphoVSbNSYA_Z5UzTdvM"/>
+</div>
+<div class="flex-1">
+<span class="text-primary text-[10px] font-black uppercase tracking-[0.2em] block mb-2">Öneri</span>
+<h3 class="text-2xl font-black mb-4">Birikimlerinizi Otomatize Edin</h3>
+<p class="text-on-surface-variant font-label text-sm leading-relaxed mb-6">
+            Maaş gününüzde hedeflerinize otomatik transferler ayarlayarak, birikimi bir tercih olmaktan çıkarıp bir alışkanlığa dönüştürebilirsiniz. Kullanıcılarımızın %65'i otomatik transferlerle hedeflerine %20 daha hızlı ulaşıyor.
+          </p>
+<div class="flex gap-4">
+<button class="bg-surface-container border border-outline-variant/30 px-6 py-3 rounded-full text-xs font-bold hover:bg-surface-variant transition-colors">Daha Fazla Bilgi</button>
+<button class="text-primary font-bold text-xs">Ayarları Aç →</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#131316]/80 backdrop-blur-xl border-t border-white/5 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] rounded-t-[2rem]">
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-400 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">dashboard</span>
+<span class="font-['Manrope'] text-[10px] font-medium">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-400 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">receipt_long</span>
+<span class="font-['Manrope'] text-[10px] font-medium">Transactions</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-400 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">trending_up</span>
+<span class="font-['Manrope'] text-[10px] font-medium">Investments</span>
+</a>
+<a class="flex flex-col items-center justify-center text-emerald-500 font-bold bg-emerald-500/10 rounded-2xl px-3 py-1 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">target</span>
+<span class="font-['Manrope'] text-[10px] font-medium">Goals</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 hover:text-emerald-400 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined mb-1">account_balance_wallet</span>
+<span class="font-['Manrope'] text-[10px] font-medium">Budgets</span>
+</a>
+</nav>
+</body></html>

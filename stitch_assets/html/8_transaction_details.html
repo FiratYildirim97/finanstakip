@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>İşlem Detayları - FinansTakip</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#ffb2b7",
+              "surface-bright": "#39393c",
+              "surface-container-highest": "#353438",
+              "surface": "#131316",
+              "on-surface": "#e4e1e6",
+              "on-tertiary-fixed-variant": "#92002a",
+              "on-secondary": "#002e6a",
+              "surface-container-lowest": "#0e0e11",
+              "surface-container": "#1f1f22",
+              "on-primary-container": "#00422b",
+              "background": "#131316",
+              "tertiary": "#ffb2b7",
+              "secondary-container": "#0566d9",
+              "surface-container-low": "#1b1b1e",
+              "surface-variant": "#353438",
+              "on-error": "#690005",
+              "primary-fixed": "#6ffbbe",
+              "outline-variant": "#3c4a42",
+              "tertiary-fixed": "#ffdadb",
+              "outline": "#86948a",
+              "on-secondary-fixed-variant": "#004395",
+              "tertiary-container": "#ff7886",
+              "on-tertiary-fixed": "#40000d",
+              "on-secondary-container": "#e6ecff",
+              "on-secondary-fixed": "#001a42",
+              "inverse-on-surface": "#303033",
+              "error": "#ffb4ab",
+              "inverse-primary": "#006c49",
+              "surface-tint": "#4edea3",
+              "primary-container": "#10b981",
+              "on-primary-fixed-variant": "#005236",
+              "surface-container-high": "#2a2a2d",
+              "secondary-fixed": "#d8e2ff",
+              "primary": "#4edea3",
+              "on-tertiary-container": "#780021",
+              "on-surface-variant": "#bbcabf",
+              "on-primary": "#003824",
+              "surface-dim": "#131316",
+              "primary-fixed-dim": "#4edea3",
+              "on-primary-fixed": "#002113",
+              "on-error-container": "#ffdad6",
+              "on-background": "#e4e1e6",
+              "inverse-surface": "#e4e1e6",
+              "secondary": "#adc6ff",
+              "on-tertiary": "#67001b",
+              "secondary-fixed-dim": "#adc6ff",
+              "error-container": "#93000a"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-card {
+        background: rgba(31, 31, 34, 0.6);
+        backdrop-filter: blur(20px);
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body min-h-screen pb-32">
+<!-- Top Navigation -->
+<header class="bg-[#131316] docked full-width top-0 sticky z-50">
+<div class="flex items-center justify-between px-6 h-16 w-full max-w-7xl mx-auto">
+<button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-emerald-500/10 transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined text-emerald-500" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-['Inter'] font-black tracking-tighter uppercase text-xl text-emerald-500">İşlem Detayları</h1>
+<div class="w-10 h-10 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-400" data-icon="account_circle">account_circle</span>
+</div>
+</div>
+</header>
+<main class="max-w-4xl mx-auto px-6 mt-8 space-y-8">
+<!-- Hero Section: Amount & Category -->
+<section class="flex flex-col md:flex-row md:items-end justify-between gap-6 p-8 rounded-xl bg-surface-container-low relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
+<div class="space-y-2">
+<div class="inline-flex items-center px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 font-label text-sm font-bold tracking-wide border border-emerald-500/20">
+<span class="material-symbols-outlined text-sm mr-2" data-icon="bolt">bolt</span>
+                    Enerji Faturası
+                </div>
+<div class="flex items-baseline gap-2">
+<span class="text-5xl md:text-7xl font-headline font-black tracking-tighter text-on-surface">₺840,00</span>
+</div>
+</div>
+<div class="flex items-center gap-3 bg-surface-container px-4 py-2 rounded-2xl">
+<span class="material-symbols-outlined text-emerald-500" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label text-sm font-semibold text-on-surface-variant uppercase tracking-widest">Tamamlandı</span>
+</div>
+</section>
+<!-- Bento Grid Content -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Quick Info Bento -->
+<div class="md:col-span-4 grid grid-cols-1 gap-6">
+<div class="bg-surface-container-low p-6 rounded-xl space-y-6">
+<div>
+<p class="font-label text-xs font-medium text-on-surface-variant uppercase tracking-widest mb-1">İşlem Tarihi</p>
+<p class="font-headline font-bold text-lg">14 Ekim 2023</p>
+</div>
+<div>
+<p class="font-label text-xs font-medium text-on-surface-variant uppercase tracking-widest mb-1">Hesap</p>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="account_balance">account_balance</span>
+<p class="font-headline font-bold text-lg text-secondary">Banka Hesabı</p>
+</div>
+</div>
+</div>
+<!-- Map Placeholder Bento -->
+<div class="bg-surface-container-low rounded-xl overflow-hidden group">
+<div class="h-48 w-full bg-surface-container relative">
+<img alt="Map view" class="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700" data-alt="abstract minimalist map of city streets in dark mode style with emerald green highlights and subtle glowing routes" data-location="Istanbul" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAom1WdmJXdSHQ81b-ekySqTHsjUOToaZpmBdRoZheTebbQU7bcXrKCl6dDf1m9n9clFvCiuoIjZiBtdCD5yl4mPQZm4jJw6sGjgDMJ1dnpSN36028aShKStlHUDzvnynoY6YNEW57uiMiu6kAxYQ4oi3VU2RM9V3GewGjBFoVyXFvrLnU0jO-Gml4zd-y_fbk73pTmr4LHV1Pk3gzq65QwzDKXKNtzr9pP10sltLA5VFRZHJLBwJs5x0rV5Ycp7SyL_OlM4IcRhchx"/>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.4)] animate-pulse">
+<span class="material-symbols-outlined text-white text-sm" data-icon="location_on" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface-container-low">
+<p class="font-label text-xs text-on-surface-variant">Kadıköy, İstanbul</p>
+</div>
+</div>
+</div>
+<!-- Edit Fields & Receipt Bento -->
+<div class="md:col-span-8 space-y-6">
+<!-- Form Area -->
+<div class="bg-surface-container-low p-8 rounded-xl space-y-8">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="space-y-2">
+<label class="font-label text-xs font-medium text-on-surface-variant uppercase tracking-widest ml-1">Kategori Değiştir</label>
+<div class="relative">
+<select class="w-full bg-surface-container-lowest border-none rounded-2xl px-4 py-4 font-headline font-semibold text-on-surface appearance-none focus:ring-0 focus:bg-surface-bright transition-all cursor-pointer">
+<option>Enerji Faturası</option>
+<option>Market</option>
+<option>Ulaşım</option>
+<option>Eğlence</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<div class="space-y-2">
+<label class="font-label text-xs font-medium text-on-surface-variant uppercase tracking-widest ml-1">Tarih</label>
+<input class="w-full bg-surface-container-lowest border-none rounded-2xl px-4 py-4 font-headline font-semibold text-on-surface focus:ring-0 focus:bg-surface-bright transition-all" type="date" value="2023-10-14"/>
+</div>
+</div>
+<div class="space-y-2">
+<label class="font-label text-xs font-medium text-on-surface-variant uppercase tracking-widest ml-1">Notlar</label>
+<textarea class="w-full bg-surface-container-lowest border-none rounded-2xl px-4 py-4 font-headline font-semibold text-on-surface focus:ring-0 focus:bg-surface-bright transition-all resize-none" placeholder="İşlem ile ilgili notunuzu buraya yazın..." rows="3">Eylül ayı elektrik kullanım bedeli. CK Boğaziçi Elektrik ödemesi.</textarea>
+</div>
+<!-- Receipt Attachment Area -->
+<div class="space-y-4">
+<label class="font-label text-xs font-medium text-on-surface-variant uppercase tracking-widest ml-1">Fatura / Makbuz Görseli</label>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="h-48 rounded-2xl overflow-hidden relative group cursor-zoom-in">
+<img alt="Receipt" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="neatly placed financial receipt on a dark gray surface with dramatic moody lighting and soft shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrKa1L-ZnOe6fWQNqXBS7ELbdcdrbtEIp_feo058zfCsUmxaLyZqRGsW3ohMj9_hHn5b2A-8sTFGdmw1Fkg8bUx5jBPzjS2ZGwvgCz5r4ixL3S1mayIzH6TA15ldfl4xz50RGQsxqh_ymHv_7_foVGbbPpAhtXqahSSOMaKQHnOoEYhtDMNAyFvsV0kQS6ISwMoCZu-VEfzcbUI0tLvPIs9ejty0mZS7EMSdGEX8L2_-Jx6zB1-vhU7CjpuHsGLBDj15vw-chzoLH4"/>
+<div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-white" data-icon="fullscreen">fullscreen</span>
+</div>
+</div>
+<button class="h-48 border-2 border-dashed border-outline-variant rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-surface-container transition-colors group">
+<span class="material-symbols-outlined text-outline group-hover:text-emerald-500 transition-colors" data-icon="add_a_photo">add_a_photo</span>
+<span class="font-label text-xs font-bold text-on-surface-variant uppercase tracking-widest">Yeni Ekle</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Action Button -->
+<div class="flex justify-end">
+<button class="w-full md:w-auto px-12 py-5 rounded-full bg-gradient-to-br from-primary-container to-primary text-on-primary font-headline font-black text-lg tracking-tight shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:shadow-[0_15px_40px_rgba(16,185,129,0.4)] transition-all active:scale-95">
+                        Değişiklikleri Kaydet
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Navigation Shell Placeholder (Suppressed for transactional focus as per mandate, but structure kept if needed for top-level) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-[#131316]/80 backdrop-blur-xl z-50 rounded-t-xl border-t border-white/5 md:hidden">
+<a class="flex flex-col items-center justify-center text-slate-500 px-4 py-2" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-['Manrope'] text-[10px] font-medium tracking-wide">Portfolio</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 px-4 py-2" href="#">
+<span class="material-symbols-outlined" data-icon="insights">insights</span>
+<span class="font-['Manrope'] text-[10px] font-medium tracking-wide">Analysis</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 px-4 py-2" href="#">
+<span class="material-symbols-outlined" data-icon="add_chart">add_chart</span>
+<span class="font-['Manrope'] text-[10px] font-medium tracking-wide">Invest</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 px-4 py-2" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-['Manrope'] text-[10px] font-medium tracking-wide">Profile</span>
+</a>
+</nav>
+</body></html>

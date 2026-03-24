@@ -1,0 +1,120 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: transactions
+    // Fields: user_id (string), type (string: income|expense), category (string), amount (number), date (string), description (string)
+    
+    // Collection: investments
+    // Fields: user_id (string), asset_type (string), name (string), ticker (string), quantity (number), avg_cost (number), current_price (number)
+    
+    // Collection: assets
+    // Fields: user_id (string), name (string), value (number), currency (string)
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.user_id;
+    }
+
+    function isValidTransaction(data) {
+      return data.user_id == request.auth.uid &&
+             data.type in ['income', 'expense'] &&
+             data.category is string && data.category.size() > 0 && data.category.size() < 100 &&
+             data.amount is number && data.amount >= 0 &&
+             data.date is string;
+    }
+
+    function isValidInvestment(data) {
+      return data.user_id == request.auth.uid &&
+             data.asset_type in ['stock', 'crypto', 'gold', 'real_estate', 'other'] &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.quantity is number && data.quantity >= 0 &&
+             data.avg_cost is number && data.avg_cost >= 0 &&
+             data.current_price is number && data.current_price >= 0;
+    }
+
+    function isValidAsset(data) {
+      return data.user_id == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.value is number;
+    }
+
+    function isValidBudget(data) {
+      return data.user_id == request.auth.uid &&
+             data.category is string &&
+             data.limit is number && data.limit >= 0 &&
+             data.period is string;
+    }
+
+    function isValidGoal(data) {
+      return data.user_id == request.auth.uid &&
+             data.name is string && data.name.size() > 0 &&
+             data.target_amount is number && data.target_amount > 0 &&
+             data.current_amount is number && data.current_amount >= 0;
+    }
+
+    function isValidRecurring(data) {
+      return data.user_id == request.auth.uid &&
+             data.type in ['income', 'expense'] &&
+             data.category is string &&
+             data.amount is number && data.amount > 0 &&
+             data.frequency in ['monthly', 'weekly', 'yearly'] &&
+             data.next_date is string;
+    }
+
+    match /transactions/{id} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidTransaction(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /investments/{id} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && isValidInvestment(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidInvestment(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /assets/{id} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && isValidAsset(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidAsset(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /budgets/{id} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && isValidBudget(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidBudget(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /goals/{id} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && isValidGoal(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidGoal(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /recurring_transactions/{id} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated() && isValidRecurring(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidRecurring(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+  }
+}

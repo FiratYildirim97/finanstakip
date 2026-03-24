@@ -1,0 +1,20 @@
+{
+  "displayName": "Emerald Ledger",
+  "theme": {
+    "colorMode": "DARK",
+    "font": "INTER",
+    "roundness": "ROUND_FULL",
+    "customColor": "#10b981",
+    "headlineFont": "INTER",
+    "bodyFont": "INTER",
+    "labelFont": "MANROPE",
+    "namedColors": {
+      "background": "#131316",
+      "surface": "#131316",
+      "primary": "#4edea3",
+      "secondary": "#adc6ff",
+      "tertiary": "#ffb2b7"
+    },
+    "designMd": "# Design System Specification: The Financial Cockpit\n\n## 1. Overview & Creative North Star\n**Creative North Star: \"The Precision Architect\"**\n\nThis design system moves beyond the \"standard dashboard\" by merging the hyper-utilitarian density of a developer’s IDE with the sophisticated, airy elegance of a premium financial editorial."
+  }
+}

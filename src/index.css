@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #4edea3;
+  --color-brand-primary-container: #10b981;
+  --color-brand-secondary: #adc6ff;
+  --color-brand-tertiary: #ffb2b7;
+  
+  --color-surface-lowest: #0e0e11;
+  --color-surface: #131316;
+  --color-surface-low: #1b1b1e;
+  --color-surface-container: #1f1f22;
+  --color-surface-high: #2a2a2d;
+  --color-surface-variant: #353438;
+  
+  --color-text-main: #e4e1e6;
+  --color-text-variant: #bbcabf;
+  
+  --font-sans: "Inter", "Manrope", sans-serif;
+  --font-display: "Inter", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@layer base {
+  body {
+    @apply antialiased bg-[var(--color-surface)] text-[var(--color-text-main)];
+    font-family: var(--font-sans);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.04em;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-[var(--color-surface-variant)]/60 backdrop-blur-xl border border-white/5;
+  }
+  
+  .primary-gradient-btn {
+    @apply bg-gradient-to-br from-[var(--color-brand-primary-container)] to-[var(--color-brand-primary)] text-green-950 font-bold hover:shadow-[0_0_20px_rgba(78,222,163,0.3)] transition-all;
+  }
+  
+  .bento-card {
+    @apply bg-[var(--color-surface-low)] rounded-3xl p-6 transition-all border-none shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)];
+  }
+  
+  .bento-card:hover {
+    @apply bg-[var(--color-surface-container)] shadow-[0_10px_40px_rgba(0,0,0,0.5)];
+  }
+}
+
+/* Custom scrollbar matching dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-[var(--color-surface-high)] rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-[var(--color-surface-variant)];
+}

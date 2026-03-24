@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FinansTakip - Net Varlık</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary-container": "#10b981",
+              "on-primary-fixed-variant": "#005236",
+              "secondary-fixed-dim": "#adc6ff",
+              "surface-dim": "#131316",
+              "on-secondary-fixed-variant": "#004395",
+              "on-tertiary-container": "#780021",
+              "secondary-fixed": "#d8e2ff",
+              "outline-variant": "#3c4a42",
+              "on-secondary-container": "#e6ecff",
+              "tertiary-fixed": "#ffdadb",
+              "on-primary": "#003824",
+              "outline": "#86948a",
+              "primary-fixed": "#6ffbbe",
+              "tertiary-container": "#ff7886",
+              "surface-tint": "#4edea3",
+              "on-secondary-fixed": "#001a42",
+              "on-primary-fixed": "#002113",
+              "primary-fixed-dim": "#4edea3",
+              "on-tertiary-fixed-variant": "#92002a",
+              "surface-bright": "#39393c",
+              "on-secondary": "#002e6a",
+              "background": "#131316",
+              "surface-container-lowest": "#0e0e11",
+              "secondary-container": "#0566d9",
+              "on-background": "#e4e1e6",
+              "surface-container-high": "#2a2a2d",
+              "error": "#ffb4ab",
+              "on-tertiary-fixed": "#40000d",
+              "inverse-on-surface": "#303033",
+              "surface-container-low": "#1b1b1e",
+              "on-error": "#690005",
+              "primary": "#4edea3",
+              "surface-variant": "#353438",
+              "secondary": "#adc6ff",
+              "on-primary-container": "#00422b",
+              "on-surface-variant": "#bbcabf",
+              "inverse-surface": "#e4e1e6",
+              "surface": "#131316",
+              "inverse-primary": "#006c49",
+              "on-surface": "#e4e1e6",
+              "tertiary": "#ffb2b7",
+              "surface-container-highest": "#353438",
+              "error-container": "#93000a",
+              "tertiary-fixed-dim": "#ffb2b7",
+              "on-tertiary": "#67001b",
+              "surface-container": "#1f1f22",
+              "on-error-container": "#ffdad6"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #131316; color: #e4e1e6; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .bento-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; }
+        .glass-card { background: rgba(31, 31, 34, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface mb-24">
+<!-- TopAppBar -->
+<header class="bg-[#131316] fixed top-0 w-full z-50 flex justify-between items-center px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center overflow-hidden border border-outline-variant/20">
+<img alt="User" data-alt="professional male portrait with minimalist lighting and dark background for financial profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA0RaGtQauvtCX-_-F7vgor3j5LiL8gg7dv21VGwSpxE0IQJNxyZ3itjGQD_EOE_bW8bV8EBS5z0EXqkqJYrQkOSAFDEQHV5yHjtpegT54djnKcXkEZAJ7DCI7D7yW5gW6rlfN5WY9NWkCwI4dRTFADYunb33Dgp0wc_byJVbke8dMwUSmOZhnkwurFxdJVKugxFRMwxdkXkQQ7-WZdoaXm2TX7zvYImMRQ3uRrLWMqqqQrRARYChvGHZnOdpCqOBcE7-NyxJyzXyEV"/>
+</div>
+<span class="text-xl font-black tracking-tighter text-emerald-500 font-headline">FinansTakip</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-slate-400 p-2 hover:bg-white/5 transition-colors rounded-full">notifications</button>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-6 pt-24 pb-12">
+<!-- Headline Section -->
+<div class="mb-10">
+<h1 class="text-4xl md:text-5xl font-black tracking-tighter text-on-surface mb-2 font-headline uppercase">Net Varlık</h1>
+<p class="text-on-surface-variant font-medium font-body max-w-xl">Varlık ve borç dengenizin zaman içindeki gelişimi.</p>
+</div>
+<div class="bento-grid">
+<!-- Section 1: Net Worth Summary Card -->
+<div class="col-span-12 lg:col-span-4 rounded-lg bg-surface-container-low p-8 flex flex-col justify-between relative overflow-hidden group hover:bg-surface-container transition-all duration-300">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 group-hover:bg-primary/10 transition-colors"></div>
+<div>
+<span class="text-xs font-bold font-label text-slate-500 uppercase tracking-widest mb-1 block">Toplam Net Varlık</span>
+<h2 class="text-5xl font-black tracking-tighter text-on-surface font-headline mb-4">₺2.484.150</h2>
+<div class="flex items-center gap-2">
+<div class="flex items-center text-primary font-bold px-2 py-1 bg-primary/10 rounded-lg text-sm">
+<span class="material-symbols-outlined text-sm mr-1">trending_up</span>
+                            +12.4%
+                        </div>
+<span class="text-xs font-medium text-on-surface-variant font-label">Net Değişim (Yıllık)</span>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant/10">
+<div class="flex justify-between items-end">
+<div class="space-y-1">
+<span class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Likidite Oranı</span>
+<div class="text-lg font-black font-headline">0.82</div>
+</div>
+<div class="h-10 w-24 flex items-end gap-1">
+<div class="w-2 bg-primary/20 h-4 rounded-t-sm"></div>
+<div class="w-2 bg-primary/30 h-6 rounded-t-sm"></div>
+<div class="w-2 bg-primary/50 h-8 rounded-t-sm"></div>
+<div class="w-2 bg-primary h-10 rounded-t-sm"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Section 2: Net Varlık Değişimi Line Chart -->
+<div class="col-span-12 lg:col-span-8 rounded-lg bg-surface-container-low p-8 relative overflow-hidden">
+<div class="flex justify-between items-center mb-8">
+<h3 class="text-lg font-black font-headline tracking-tight uppercase">Net Varlık Değişimi</h3>
+<div class="flex gap-2">
+<button class="px-3 py-1 rounded-full bg-surface-container text-xs font-bold text-slate-400 hover:text-primary transition-colors">6A</button>
+<button class="px-3 py-1 rounded-full bg-primary/10 text-xs font-bold text-primary">1Y</button>
+<button class="px-3 py-1 rounded-full bg-surface-container text-xs font-bold text-slate-400 hover:text-primary transition-colors">TÜMÜ</button>
+</div>
+</div>
+<!-- Simulated Chart Area -->
+<div class="relative h-64 w-full mt-4">
+<svg class="w-full h-full drop-shadow-[0_10px_20px_rgba(16,185,129,0.15)]" viewbox="0 0 1000 300">
+<!-- Chart Gradient -->
+<defs>
+<lineargradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#10b981" stop-opacity="0.2"></stop>
+<stop offset="100%" stop-color="#10b981" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<!-- Area Fill -->
+<path d="M0,280 Q100,260 200,240 T400,220 T600,160 T800,100 L1000,60 L1000,300 L0,300 Z" fill="url(#chartGradient)"></path>
+<!-- Line -->
+<path d="M0,280 Q100,260 200,240 T400,220 T600,160 T800,100 L1000,60" fill="none" stroke="#10b981" stroke-linecap="round" stroke-width="4"></path>
+<!-- Data Points -->
+<circle cx="200" cy="240" fill="#131316" r="4" stroke="#10b981" stroke-width="2"></circle>
+<circle cx="600" cy="160" fill="#131316" r="4" stroke="#10b981" stroke-width="2"></circle>
+<circle cx="1000" cy="60" fill="#10b981" r="6"></circle>
+</svg>
+<div class="flex justify-between mt-4 text-[10px] font-bold font-label text-slate-500 uppercase tracking-widest">
+<span>Ocak 23</span>
+<span>Nisan 23</span>
+<span>Temmuz 23</span>
+<span>Ekim 23</span>
+<span>Ocak 24</span>
+</div>
+</div>
+</div>
+<!-- Section 3: Asset vs. Liability Breakdown -->
+<div class="col-span-12 md:col-span-7 rounded-lg bg-surface-container-low p-8">
+<h3 class="text-lg font-black font-headline tracking-tight uppercase mb-8">Varlık ve Borç Dengesi</h3>
+<div class="space-y-8">
+<!-- Total Assets -->
+<div class="space-y-3">
+<div class="flex justify-between items-end">
+<div>
+<span class="text-xs font-bold font-label text-slate-500 uppercase tracking-widest block mb-1">Toplam Varlıklar</span>
+<span class="text-2xl font-black font-headline text-on-surface">₺3.120.400</span>
+</div>
+<span class="text-sm font-bold text-primary font-label">100%</span>
+</div>
+<div class="h-3 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full w-full"></div>
+</div>
+</div>
+<!-- Total Liabilities -->
+<div class="space-y-3">
+<div class="flex justify-between items-end">
+<div>
+<span class="text-xs font-bold font-label text-slate-500 uppercase tracking-widest block mb-1">Toplam Borçlar</span>
+<span class="text-2xl font-black font-headline text-tertiary">₺636.250</span>
+</div>
+<span class="text-sm font-bold text-tertiary font-label">20.4%</span>
+</div>
+<div class="h-3 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary rounded-full" style="width: 20.4%"></div>
+</div>
+</div>
+</div>
+<div class="mt-10 grid grid-cols-2 gap-4">
+<div class="p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/5">
+<span class="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Özsermaye Oranı</span>
+<div class="text-xl font-black font-headline text-primary">79.6%</div>
+</div>
+<div class="p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/5">
+<span class="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Kaldıraç Oranı</span>
+<div class="text-xl font-black font-headline text-tertiary">0.25</div>
+</div>
+</div>
+</div>
+<!-- Section 4: Category Distribution -->
+<div class="col-span-12 md:col-span-5 rounded-lg bg-surface-container-low p-8 flex flex-col">
+<h3 class="text-lg font-black font-headline tracking-tight uppercase mb-6">Kategori Dağılımı</h3>
+<div class="flex-grow space-y-4">
+<!-- Nakit -->
+<div class="flex items-center justify-between p-4 rounded-2xl bg-surface-container-lowest group hover:bg-surface-variant transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">payments</span>
+</div>
+<div>
+<div class="text-sm font-black font-headline">Nakit</div>
+<div class="text-[10px] font-bold text-slate-500 uppercase">₺420.000</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-sm font-black font-headline text-on-surface">13.5%</div>
+</div>
+</div>
+<!-- Gayrimenkul -->
+<div class="flex items-center justify-between p-4 rounded-2xl bg-surface-container-lowest group hover:bg-surface-variant transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined">domain</span>
+</div>
+<div>
+<div class="text-sm font-black font-headline">Gayrimenkul</div>
+<div class="text-[10px] font-bold text-slate-500 uppercase">₺1.850.000</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-sm font-black font-headline text-on-surface">59.3%</div>
+</div>
+</div>
+<!-- Yatırım -->
+<div class="flex items-center justify-between p-4 rounded-2xl bg-surface-container-lowest group hover:bg-surface-variant transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-primary-container/20 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined">monitoring</span>
+</div>
+<div>
+<div class="text-sm font-black font-headline">Yatırım</div>
+<div class="text-[10px] font-bold text-slate-500 uppercase">₺680.000</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-sm font-black font-headline text-on-surface">21.8%</div>
+</div>
+</div>
+<!-- Emtia -->
+<div class="flex items-center justify-between p-4 rounded-2xl bg-surface-container-lowest group hover:bg-surface-variant transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-tertiary/10 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined">database</span>
+</div>
+<div>
+<div class="text-sm font-black font-headline">Emtia</div>
+<div class="text-[10px] font-bold text-slate-500 uppercase">₺170.400</div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-sm font-black font-headline text-on-surface">5.4%</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Section 5: Büyüme Hızı (Growth Rate) analysis -->
+<div class="col-span-12 rounded-lg bg-surface-container p-8 border border-primary/10">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+<div>
+<h4 class="text-sm font-black font-headline uppercase tracking-tighter text-primary mb-4">Büyüme Hızı Analizi</h4>
+<p class="text-sm text-on-surface-variant font-body leading-relaxed">Varlıklarınızın pasif ve aktif büyüme oranları doğrultusunda hazırlanan projeksiyon verileridir.</p>
+</div>
+<div class="flex flex-col gap-2">
+<span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Aylık Ortalama Artış</span>
+<div class="text-3xl font-black font-headline text-on-surface flex items-baseline gap-2">
+                            ₺34.200
+                            <span class="text-xs text-primary font-bold">+2.1%</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden mt-2">
+<div class="h-full bg-primary w-2/3 rounded-full"></div>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Yıllık Projeksiyon</span>
+<div class="text-3xl font-black font-headline text-on-surface flex items-baseline gap-2">
+                            ₺2.894.550
+                        </div>
+<div class="text-xs font-medium text-on-surface-variant mt-2">Mevcut trend ile 12 ay sonrası tahmin.</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#1B1B1E]/80 backdrop-blur-xl shadow-[0_-10px_30px_rgba(0,0,0,0.5)] rounded-t-3xl">
+<a class="flex flex-col items-center justify-center text-slate-500 opacity-60 hover:text-emerald-300 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined group-active:scale-110 transition-transform">dashboard</span>
+<span class="text-[10px] font-medium font-label uppercase tracking-wider mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 opacity-60 hover:text-emerald-300 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined group-active:scale-110 transition-transform">receipt_long</span>
+<span class="text-[10px] font-medium font-label uppercase tracking-wider mt-1">Transactions</span>
+</a>
+<a class="flex flex-col items-center justify-center text-emerald-400 bg-emerald-500/10 rounded-2xl px-3 py-1 scale-110 duration-300" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">trending_up</span>
+<span class="text-[10px] font-medium font-label uppercase tracking-wider mt-1">Investments</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 opacity-60 hover:text-emerald-300 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined group-active:scale-110 transition-transform">ads_click</span>
+<span class="text-[10px] font-medium font-label uppercase tracking-wider mt-1">Goals</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 opacity-60 hover:text-emerald-300 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined group-active:scale-110 transition-transform">account_balance_wallet</span>
+<span class="text-[10px] font-medium font-label uppercase tracking-wider mt-1">Budgets</span>
+</a>
+</nav>
+</body></html>

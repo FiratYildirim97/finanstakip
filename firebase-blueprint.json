@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "User income or expense record",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "description": "Owner UID" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "type", "category", "amount", "date"]
+    },
+    "Investment": {
+      "title": "Investment",
+      "description": "User investment asset",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "asset_type": { "type": "string", "enum": ["stock", "crypto", "gold", "real_estate", "other"] },
+        "name": { "type": "string" },
+        "ticker": { "type": "string" },
+        "quantity": { "type": "number" },
+        "avg_cost": { "type": "number" },
+        "current_price": { "type": "number" },
+        "currency": { "type": "string" },
+        "last_updated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "asset_type", "name", "quantity", "avg_cost", "current_price"]
+    },
+    "Asset": {
+      "title": "Asset",
+      "description": "Fixed asset like cash or bank account",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "name": { "type": "string" },
+        "value": { "type": "number" },
+        "currency": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "name", "value"]
+    },
+    "Budget": {
+      "title": "Budget",
+      "description": "Monthly spending limit for a category",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "category": { "type": "string" },
+        "limit": { "type": "number" },
+        "period": { "type": "string" }
+      },
+      "required": ["user_id", "category", "limit", "period"]
+    },
+    "Goal": {
+      "title": "Goal",
+      "description": "Savings goal for the user",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "name": { "type": "string" },
+        "target_amount": { "type": "number" },
+        "current_amount": { "type": "number" },
+        "deadline": { "type": "string", "format": "date" }
+      },
+      "required": ["user_id", "name", "target_amount", "current_amount"]
+    },
+    "RecurringTransaction": {
+      "title": "RecurringTransaction",
+      "description": "Automatic transaction entry",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "frequency": { "type": "string", "enum": ["monthly", "weekly", "yearly"] },
+        "next_date": { "type": "string", "format": "date" }
+      },
+      "required": ["user_id", "type", "category", "amount", "frequency", "next_date"]
+    }
+  },
+  "firestore": {
+    "/transactions/{id}": { "schema": "Transaction", "description": "User transactions" },
+    "/investments/{id}": { "schema": "Investment", "description": "User investments" },
+    "/assets/{id}": { "schema": "Asset", "description": "User fixed assets" },
+    "/budgets/{id}": { "schema": "Budget", "description": "User budgets" },
+    "/goals/{id}": { "schema": "Goal", "description": "User goals" },
+    "/recurring_transactions/{id}": { "schema": "RecurringTransaction", "description": "User recurring transactions" }
+  }
+}
