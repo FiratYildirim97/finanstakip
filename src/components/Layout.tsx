@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { LayoutDashboard, ReceiptText, TrendingUp, Wallet, LogOut, Sprout } from 'lucide-react';
+import { LayoutDashboard, ReceiptText, TrendingUp, Wallet, LogOut, Sprout, CalendarDays, PiggyBank, Landmark } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,15 +18,18 @@ export const Layout = ({ children }: LayoutProps) => {
 
   const navItems = [
     { to: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { to: '/transactions', icon: <ReceiptText size={20} />, label: 'Harcama / Gelir' },
+    { to: '/transactions', icon: <ReceiptText size={20} />, label: 'İşlemler' },
+    { to: '/recurring', icon: <CalendarDays size={20} />, label: 'Aylık' },
+    { to: '/savings', icon: <PiggyBank size={20} />, label: 'Birikim' },
     { to: '/investments', icon: <TrendingUp size={20} />, label: 'Yatırımlar' },
-    { to: '/net-worth', icon: <Wallet size={20} />, label: 'Net Varlık' },
+    { to: '/accounts', icon: <Landmark size={20} />, label: 'Hesaplar' },
+    { to: '/net-worth', icon: <Wallet size={20} />, label: 'Varlık' },
   ];
 
   return (
-    <div className="flex h-screen bg-[#131316] text-[#e4e1e6] font-sans selection:bg-[#4edea3]/30">
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#0e0e11] border-r border-white/5 flex flex-col relative z-20 shadow-2xl">
+    <div className="flex h-[100dvh] w-full bg-[#131316] text-[#e4e1e6] font-sans selection:bg-[#4edea3]/30 overflow-hidden">
+      {/* Sidebar (Desktop) */}
+      <aside className="hidden md:flex w-64 bg-[#0e0e11] border-r border-white/5 flex-col relative z-20 shadow-2xl">
         <div className="p-8 flex items-center gap-3 border-b border-white/5">
           <div className="bg-gradient-to-br from-[#10b981] to-[#4edea3] p-2.5 rounded-xl text-[#002113] shadow-[0_4px_20px_rgba(78,222,163,0.3)]">
             <Sprout size={24} strokeWidth={2.5} />
@@ -71,11 +74,51 @@ export const Layout = ({ children }: LayoutProps) => {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-10 relative z-10 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] bg-repeat opacity-95 text-[#e4e1e6]">
-        <div className="max-w-[1400px] mx-auto">
-          {children}
-        </div>
-      </main>
+      <div className="flex-1 flex flex-col min-w-0 h-full relative z-10">
+        {/* Mobile Header */}
+        <header className="md:hidden flex items-center justify-between p-4 bg-[#0e0e11] border-b border-white/5 z-20 shadow-sm relative">
+          <div className="flex items-center gap-2">
+            <div className="bg-gradient-to-br from-[#10b981] to-[#4edea3] p-1.5 rounded-lg text-[#002113]">
+              <Sprout size={20} strokeWidth={2.5} />
+            </div>
+            <h1 className="text-lg font-bold tracking-tight text-white">
+              FinansTakip
+            </h1>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="p-2 text-[#ff7886] hover:bg-[#ffb4ab]/10 rounded-lg transition"
+          >
+            <LogOut size={18} />
+          </button>
+        </header>
+
+        <main className="flex-1 overflow-y-auto w-full p-4 md:p-10 pb-28 md:pb-10 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] bg-repeat opacity-95 text-[#e4e1e6]">
+          <div className="max-w-[1400px] mx-auto w-full">
+            {children}
+          </div>
+        </main>
+      </div>
+
+      {/* Bottom Nav (Mobile) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0e0e11]/95 backdrop-blur-md border-t border-white/10 z-50 flex justify-around items-center px-2 py-3 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-1.5 p-2 px-4 rounded-xl transition-all duration-300 ${
+                isActive 
+                  ? 'text-[#4edea3]' 
+                  : 'text-[#86948a] hover:text-white'
+              }`
+            }
+          >
+            {item.icon}
+            <span className="text-[10px] font-medium tracking-wide">{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 };

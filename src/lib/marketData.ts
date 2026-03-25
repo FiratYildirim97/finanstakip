@@ -29,29 +29,32 @@ export const fetchLivePrices = async (investments: Investment[]): Promise<Record
       }
     }
 
-    // 2. Döviz (Frankfurter - Key gerekmez)
-    let usdToTry = 32.5; 
+    // 2. Genel USD/TRY Kuru (Finnhub için) - Ücretsiz / Sınırsız
+    let usdToTry = 35.0; // Fallback
     try {
-      const fxRes = await fetch('https://api.frankfurter.app/latest?from=USD&to=TRY');
-      if (fxRes.ok) {
-        usdToTry = (await fxRes.json()).rates.TRY;
+      const fxRes = await fetch(`https://open.er-api.com/v6/latest/TRY`);
+      const fxData = await fxRes.json();
+      if (fxData.rates && fxData.rates.USD) {
+         usdToTry = 1 / fxData.rates.USD;
       }
     } catch {}
 
-    // 3. ABD Hisse Senetleri (Finnhub) / BIST Hisseleri (CollectAPI / Yahoo)
+    // 3. Hisse Senetleri
     const stockInvestments = investments.filter(inv => inv.asset_type === 'stock');
     for (const inv of stockInvestments) {
-      if (inv.symbol.includes('.IS')) {
-        // Türk Hisse Senedi (BIST)
-        if (COLLECT_API_KEY) {
-          try {
-            const res = await fetch(`https://api.collectapi.com/economy/hisseSenedi`, {
-              headers: { 'authorization': `apikey ${COLLECT_API_KEY}`, 'content-type': 'application/json' }
-            });
-            const data = await res.json();
-            const stockData = data.result?.find((s: any) => s.code === inv.symbol.replace('.IS', ''));
-            if (stockData?.current) updatedPrices[inv.id] = stockData.current;
-          } catch {}
+      if (inv.symbol.includes('.IS') || !inv.symbol.includes('.')) {
+        // Türk Hisse Senedi (BIST) - Yahoo Finance (corsproxy.io) - Ücretsiz / Sınırsız
+        try {
+          const yfSymbol = inv.symbol.includes('.IS') ? inv.symbol : `${inv.symbol}.IS`;
+          const targetUrl = encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${yfSymbol}`);
+          const res = await fetch(`https://corsproxy.io/?url=${targetUrl}`);
+          const data = await res.json();
+          const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+          if (price) {
+            updatedPrices[inv.id] = price;
+          }
+        } catch (e) {
+           console.error("BIST Hisse çekilemedi:", e);
         }
       } else {
         // ABD Hisse Senedi (Finnhub)
@@ -65,18 +68,63 @@ export const fetchLivePrices = async (investments: Investment[]): Promise<Record
       }
     }
 
-    // 4. Altın (Gram / Çeyrek vb.) - CollectAPI
-    const goldInvestments = investments.filter(inv => inv.asset_type === 'gold');
-    if (goldInvestments.length > 0 && COLLECT_API_KEY) {
+    // 4. Altın ve Emtia (CollectAPI)
+    const commodityInvestments = investments.filter(inv => inv.asset_type === 'commodity' || (inv.asset_type as any) === 'gold');
+    if (commodityInvestments.length > 0 && COLLECT_API_KEY) {
       try {
         const res = await fetch(`https://api.collectapi.com/economy/goldPrice`, {
           headers: { 'authorization': `apikey ${COLLECT_API_KEY}`, 'content-type': 'application/json' }
         });
         const data = await res.json();
-        goldInvestments.forEach(inv => {
-           // Örn: sembol 'GRAM' veya 'ÇEYREK'
-           const goldData = data.result?.find((g: any) => g.name.toLowerCase().includes(inv.symbol.toLowerCase()) || g.name === 'Gram Altın');
-           if (goldData?.buying) updatedPrices[inv.id] = goldData.buying;
+        commodityInvestments.forEach(inv => {
+           let searchName = inv.symbol.toLowerCase();
+           if (searchName === 'gram') searchName = 'gram altın';
+           if (searchName === 'çeyrek') searchName = 'çeyrek altın';
+           
+           const goldData = data.result?.find((g: any) => g.name.toLowerCase().includes(searchName) || g.name.toLowerCase() === inv.name.toLowerCase());
+           if (goldData?.buying) updatedPrices[inv.id] = parseFloat(goldData.buying);
+        });
+      } catch (e) {
+         console.warn("CollectAPI Altın Hatası:", e);
+      }
+    } 
+    
+    // Ücretsiz Altın Fallback (GC=F Ounce / 31.1034 * USD/TRY)
+    const missingGolds = commodityInvestments.filter(inv => !updatedPrices[inv.id]);
+    if (missingGolds.length > 0) {
+       try {
+          const targetUrl = encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/GC=F`);
+          const res = await fetch(`https://corsproxy.io/?url=${targetUrl}`);
+          const data = await res.json();
+          const ounceUsd = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+          if (ounceUsd && usdToTry) {
+            const tryPerGram = (ounceUsd / 31.1034768) * usdToTry;
+            missingGolds.forEach(inv => {
+               const type = inv.symbol.toLowerCase();
+               let multiplier = 1;
+               if (type.includes('çeyrek')) multiplier = 1.64; // Çeyrek altın safiyet çarpanı ortalama
+               else if (type.includes('yarım')) multiplier = 3.28;
+               else if (type.includes('tam')) multiplier = 6.56;
+               
+               updatedPrices[inv.id] = tryPerGram * multiplier;
+            });
+          }
+       } catch (e) {
+          console.warn("Ücretsiz Altın Fallback Hatası:", e);
+       }
+    }
+
+    // 5. Dövizler - Ücretsiz / Sınırsız
+    const currencyInvestments = investments.filter(inv => inv.asset_type === 'currency');
+    if (currencyInvestments.length > 0) {
+      try {
+        const fxRes = await fetch(`https://open.er-api.com/v6/latest/TRY`);
+        const data = await fxRes.json();
+        currencyInvestments.forEach(inv => {
+          const rate = data.rates?.[inv.symbol.toUpperCase()];
+          if (rate) {
+            updatedPrices[inv.id] = 1 / rate;
+          }
         });
       } catch {}
     }

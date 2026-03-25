@@ -52,12 +52,24 @@ export const useInvestments = () => {
   const addInvestment = async (investment: Partial<Investment>) => {
     if (!user) return { error: 'Oturum açık değil' };
     const { data, error } = await supabase.from('investments').insert([{ ...investment, user_id: user.id }]).select();
+    if (data && data.length > 0) {
+      setInvestments(prev => [data[0] as Investment, ...prev]);
+    }
     return { data, error };
   };
 
   const deleteInvestment = async (id: string) => {
+    setInvestments(prev => prev.filter(inv => inv.id !== id));
     const { error } = await supabase.from('investments').delete().eq('id', id);
     return { error };
+  };
+
+  const updateInvestment = async (id: string, updates: Partial<Investment>) => {
+    const { data, error } = await supabase.from('investments').update(updates).eq('id', id).select();
+    if (data && data.length > 0) {
+      setInvestments(prev => prev.map(inv => inv.id === id ? (data[0] as Investment) : inv));
+    }
+    return { data, error };
   };
 
   const updateInvestmentPrices = async (priceMap: Record<string, number>) => {
@@ -67,5 +79,5 @@ export const useInvestments = () => {
     }
   };
 
-  return { investments, loading, addInvestment, deleteInvestment, updateInvestmentPrices };
+  return { investments, loading, addInvestment, deleteInvestment, updateInvestmentPrices, updateInvestment };
 };

@@ -4,25 +4,32 @@ import { NetWorthHistory } from '../types';
 import { useAuth } from './useAuth';
 import { useTransactions } from './useTransactions';
 import { useInvestments } from './useInvestments';
+import { useVirtualSavings } from './useVirtualSavings';
+import { useBankAccounts } from './useBankAccounts';
 
 export const useNetWorth = () => {
   const { user } = useAuth();
   const { transactions } = useTransactions();
   const { investments } = useInvestments();
+  const { totalVirtualValue } = useVirtualSavings();
+  const { accounts } = useBankAccounts();
   const [history, setHistory] = useState<NetWorthHistory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Dynamic Calculation of Current Net Worth
   const currentNetWorth = (() => {
-    const cash = transactions.reduce((acc, curr) => {
+    const cashFlow = transactions.reduce((acc, curr) => {
       return curr.type === 'income' ? acc + curr.amount : acc - curr.amount;
     }, 0);
+    
+    const bankCash = accounts.reduce((acc, a) => acc + a.balance, 0);
+    const cash = cashFlow + bankCash;
 
     const portfolioValue = investments.reduce((acc, curr) => {
       return acc + (curr.quantity * curr.current_price);
     }, 0);
 
-    return cash + portfolioValue;
+    return cash + portfolioValue + totalVirtualValue;
   })();
 
   useEffect(() => {

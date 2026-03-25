@@ -19,7 +19,7 @@ create table public.transactions (
 create table public.investments (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
-  asset_type text not null check (asset_type in ('stock', 'crypto', 'gold')),
+  asset_type text not null check (asset_type in ('stock', 'crypto', 'gold', 'commodity', 'currency')),
   name text not null,
   symbol text not null,
   quantity numeric not null,

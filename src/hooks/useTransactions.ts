@@ -53,10 +53,14 @@ export const useTransactions = () => {
   const addTransaction = async (transaction: Partial<Transaction>) => {
     if (!user) return { error: 'Oturum açık değil' };
     const { data, error } = await supabase.from('transactions').insert([{ ...transaction, user_id: user.id }]).select();
+    if (data && data.length > 0) {
+      setTransactions(prev => [data[0] as Transaction, ...prev]);
+    }
     return { data, error };
   };
 
   const deleteTransaction = async (id: string) => {
+    setTransactions(prev => prev.filter(t => t.id !== id));
     const { error } = await supabase.from('transactions').delete().eq('id', id);
     return { error };
   };

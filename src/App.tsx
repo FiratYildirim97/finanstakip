@@ -8,6 +8,9 @@ import { Dashboard } from './pages/Dashboard';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { InvestmentsPage } from './pages/InvestmentsPage';
 import { NetWorthPage } from './pages/NetWorthPage';
+import { RecurringTransactionsPage } from './pages/RecurringTransactionsPage';
+import { SavingsPage } from './pages/SavingsPage';
+import { BankAccountsPage } from './pages/BankAccountsPage';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -37,6 +40,9 @@ export default function App() {
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/investments" element={<InvestmentsPage />} />
           <Route path="/net-worth" element={<NetWorthPage />} />
+          <Route path="/recurring" element={<RecurringTransactionsPage />} />
+          <Route path="/savings" element={<SavingsPage />} />
+          <Route path="/accounts" element={<BankAccountsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

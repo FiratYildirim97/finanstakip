@@ -69,11 +69,11 @@ export const TransactionsPage = () => {
   };
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-4xl font-bold tracking-tight text-white font-display">İşlemler (Gelir / Gider)</h1>
+    <div className="space-y-6 md:space-y-8">
+      <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white font-display">İşlemler</h1>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1 space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+        <div className="lg:col-span-1 space-y-6 md:space-y-8">
           {/* AI Quick Add Box */}
           <div className="glass-panel p-6 rounded-3xl relative overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.4)]">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-brand-primary)]/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
@@ -155,31 +155,31 @@ export const TransactionsPage = () => {
             ) : (
               <ul className="divide-y divide-white/5 max-h-[700px] overflow-y-auto">
                 {transactions.map((tx, idx) => (
-                  <li key={tx.id} className={`p-5 hover:bg-[var(--color-surface-container)] transition-colors flex items-center justify-between group ${idx % 2 === 0 ? 'bg-[var(--color-surface-lowest)]' : 'bg-transparent'}`}>
-                    <div className="flex items-center gap-5">
-                      <div className={`p-2.5 rounded-2xl ${tx.type === 'income' ? 'bg-[var(--color-brand-primary)]/10 text-[var(--color-brand-primary)]' : 'bg-[var(--color-brand-tertiary)]/10 text-[var(--color-brand-tertiary)]'}`}>
+                  <li key={tx.id} className={`p-4 md:p-5 hover:bg-[var(--color-surface-container)] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group ${idx % 2 === 0 ? 'bg-[var(--color-surface-lowest)]' : 'bg-transparent'}`}>
+                    <div className="flex items-center gap-4 md:gap-5">
+                      <div className={`p-2.5 rounded-2xl shrink-0 ${tx.type === 'income' ? 'bg-[var(--color-brand-primary)]/10 text-[var(--color-brand-primary)]' : 'bg-[var(--color-brand-tertiary)]/10 text-[var(--color-brand-tertiary)]'}`}>
                         {tx.type === 'income' ? <ArrowUpCircle size={22} strokeWidth={2.5} /> : <ArrowDownCircle size={22} strokeWidth={2.5} />}
                       </div>
                       <div>
                         <p className="font-bold text-white text-base">{tx.category}</p>
-                        <div className="flex items-center gap-2 text-xs text-[var(--color-text-variant)] mt-1 font-mono">
+                        <div className="flex items-center gap-2 text-xs text-[var(--color-text-variant)] mt-1 font-mono flex-wrap">
                           <span>{tx.date}</span>
                           {tx.description && (
                             <>
-                              <span className="text-white/20">•</span>
-                              <span className="truncate max-w-[250px]">{tx.description}</span>
+                              <span className="text-white/20 hidden sm:inline">•</span>
+                              <span className="truncate max-w-[200px] sm:max-w-[250px] block sm:inline">{tx.description}</span>
                             </>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-5">
+                    <div className="flex items-center justify-between sm:justify-end gap-5 w-full sm:w-auto mt-2 sm:mt-0">
                       <span className={`font-black font-mono text-lg ${tx.type === 'income' ? 'text-[var(--color-brand-primary)]' : 'text-white'}`}>
                         {tx.type === 'income' ? '+' : '-'}{new Intl.NumberFormat('tr-TR').format(tx.amount)} ₺
                       </span>
                       <button 
                         onClick={() => deleteTransaction(tx.id)}
-                        className="p-2.5 text-[var(--color-text-variant)] hover:text-[#ff7886] hover:bg-[#ffb4ab]/10 rounded-xl transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        className="p-2.5 text-[var(--color-text-variant)] hover:text-[#ff7886] hover:bg-[#ffb4ab]/10 rounded-xl transition-all sm:opacity-0 group-hover:opacity-100 focus:opacity-100"
                       >
                         <Trash2 size={18} />
                       </button>

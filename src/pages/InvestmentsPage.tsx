@@ -1,18 +1,33 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, ChangeEvent, useEffect } from 'react';
 import { useInvestments } from '../hooks/useInvestments';
 import { investmentAgent } from '../lib/agents';
-import { Sparkles, Plus, Trash2, LineChart, ShieldAlert, RefreshCw } from 'lucide-react';
+import { Sparkles, Plus, Trash2, LineChart, ShieldAlert, RefreshCw, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { AssetType } from '../types';
+import { AssetType, Investment } from '../types';
 import { fetchLivePrices } from '../lib/marketData';
+import { ASSET_OPTIONS } from '../lib/constants';
 
 export const InvestmentsPage = () => {
-  const { investments, loading, addInvestment, deleteInvestment, updateInvestmentPrices } = useInvestments();
+  const { investments, loading, addInvestment, deleteInvestment, updateInvestmentPrices, updateInvestment } = useInvestments();
   
+  // Quick Add State
+  const [quickAddId, setQuickAddId] = useState<string | null>(null);
+  const [quickAddQty, setQuickAddQty] = useState('');
+  const [quickAddPrice, setQuickAddPrice] = useState('');
+  
+  // Edit State
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editQty, setEditQty] = useState('');
+  const [editAvgPrice, setEditAvgPrice] = useState('');
+  const [editCurrentPrice, setEditCurrentPrice] = useState('');
+
   // AI Form State
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isFetchingPrices, setIsFetchingPrices] = useState(false);
   const [advice, setAdvice] = useState<string | null>(null);
+  
+  // Sadece ilk açılışta bir kez otomatik çekim yapmak için
+  const [hasAutoFetched, setHasAutoFetched] = useState(false);
 
   // Manual Form State
   const [assetType, setAssetType] = useState<AssetType>('stock');
@@ -21,6 +36,39 @@ export const InvestmentsPage = () => {
   const [quantity, setQuantity] = useState('');
   const [avgPrice, setAvgPrice] = useState('');
   const [currentPrice, setCurrentPrice] = useState('');
+  
+  // Debug State
+  const [debugError, setDebugError] = useState<string | null>(null);
+
+  const handleAssetTypeChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    setAssetType(e.target.value as AssetType);
+    setSymbol('');
+    setName('');
+  };
+
+  const handleAssetSelect = async (e: ChangeEvent<HTMLSelectElement>) => {
+    const selectedSymbol = e.target.value;
+    const option = ASSET_OPTIONS[assetType]?.find(opt => opt.symbol === selectedSymbol);
+    if (option) {
+      setSymbol(option.symbol);
+      setName(option.name);
+    } else {
+      setSymbol('');
+      setName('');
+    }
+  };
+
+  useEffect(() => {
+    if (!loading && investments.length > 0 && !hasAutoFetched) {
+      setHasAutoFetched(true);
+      // Sessiz sedasız kur güncellemesi yap (sanal yatırımlar için 1 yerine güncel kur otursun)
+      fetchLivePrices(investments).then(livePrices => {
+        if (Object.keys(livePrices).length > 0) {
+          updateInvestmentPrices(livePrices);
+        }
+      }).catch(() => {});
+    }
+  }, [loading, investments, hasAutoFetched, updateInvestmentPrices]);
 
   const handleGetAnalysis = async () => {
     if (investments.length === 0) {
@@ -55,10 +103,46 @@ export const InvestmentsPage = () => {
   const handleManualSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const qty = parseFloat(quantity);
-    const avg = parseFloat(avgPrice);
-    const current = parseFloat(currentPrice);
+    let avg = avgPrice === '' ? null : parseFloat(avgPrice);
+    let current = parseFloat(currentPrice);
     
-    if (!qty || !avg || !current || !name || !symbol) return;
+    if (!qty || !name || !symbol) return;
+
+    setIsFetchingPrices(true);
+    toast.loading(`${name} portföye eklenirken fiyat değerleniyor...`, { id: 'submit-price' });
+
+    try {
+      const dummyInvestment: Investment = {
+        id: 'temp',
+        asset_type: assetType,
+        symbol: symbol,
+        name: name,
+        quantity: qty,
+        avg_price: avg,
+        current_price: 1,
+        user_id: '',
+        created_at: ''
+      };
+      
+      const prices = await fetchLivePrices([dummyInvestment]);
+      if (prices['temp']) {
+        current = prices['temp']; // API'den başarılırsa current güncellenir
+      }
+    } catch {
+      // API fail silently handled below
+    }
+
+    // Eğer maliyet de yok, güncel fiyat da çekilemediyse
+    if (isNaN(current) && avg === null) {
+      toast.error('Güncel fiyat çekilemedi ve maliyet girmediniz. Lütfen en az birini doldurun.', { id: 'submit-price' });
+      setIsFetchingPrices(false);
+      return;
+    }
+
+    // Eğer sistem current çekemediyse (fakat user avg yazdıysa), current'ı avg'ye eşitle.
+    if (isNaN(current) && avg !== null) {
+      current = avg;
+    }
 
     const { error } = await addInvestment({
       asset_type: assetType,
@@ -70,31 +154,55 @@ export const InvestmentsPage = () => {
     });
 
     if (!error) {
-      toast.success('Yatırım kaydedildi');
+      toast.success('Yatırım kaydedildi!', { id: 'submit-price' });
       setName('');
       setSymbol('');
       setQuantity('');
       setAvgPrice('');
       setCurrentPrice('');
+      setDebugError(null);
     } else {
-      toast.error((error as any).message || String(error));
+      const errMessage = (error as any).message || String(error);
+      const errDetails = JSON.stringify(error, null, 2);
+      setDebugError(`Hata Mesajı: ${errMessage}\nDetaylar:\n${errDetails}`);
+      toast.error('Kayıt başarısız, lütfen sayfadaki hata kutusuna bakın.', { id: 'submit-price', duration: 8000 });
+      console.error(error);
     }
+    
+    setIsFetchingPrices(false);
   };
 
   const totalValue = investments.reduce((acc, curr) => acc + (curr.quantity * curr.current_price), 0);
-  const totalCost = investments.reduce((acc, curr) => acc + (curr.quantity * curr.avg_price), 0);
-  const totalProfit = totalValue - totalCost;
+  
+  // Sadece maliyeti belli olan yatırımlar için toplam maliyet hesaplanır
+  const validInvestments = investments.filter(inv => inv.avg_price !== null);
+  const calculableValue = validInvestments.reduce((acc, curr) => acc + (curr.quantity * curr.current_price), 0);
+  const totalCost = validInvestments.reduce((acc, curr) => acc + (curr.quantity * (curr.avg_price as number)), 0);
+  const totalProfit = calculableValue - totalCost;
   const isProfit = totalProfit >= 0;
 
+  const assetLabels: Record<AssetType, string> = {
+    stock: 'Hisse Senetleri',
+    crypto: 'Kripto Paralar',
+    commodity: 'Emtia / Değerli Maden',
+    currency: 'Döviz',
+  };
+
+  const groupedInvestments = investments.reduce((acc, inv) => {
+    if (!acc[inv.asset_type]) acc[inv.asset_type] = [];
+    acc[inv.asset_type].push(inv);
+    return acc;
+  }, {} as Record<string, typeof investments>);
+
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-4xl font-bold tracking-tight text-white font-display">Yatırım Portföyü</h1>
-        <div className="flex gap-4">
+    <div className="space-y-6 md:space-y-8">
+      <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:items-center justify-between gap-2 md:gap-4">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white font-display">Yatırım Portföyü</h1>
+        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full md:w-auto">
           <button 
             onClick={handleFetchPrices}
             disabled={isFetchingPrices || investments.length === 0}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#4edeb3]/10 border border-[#4edeb3]/50 text-[#4edeb3] rounded-full hover:bg-[#4edeb3]/20 font-bold transition backdrop-blur-md disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 w-full sm:w-auto bg-[#4edeb3]/10 border border-[#4edeb3]/50 text-[#4edeb3] rounded-full hover:bg-[#4edeb3]/20 font-bold transition backdrop-blur-md disabled:opacity-50"
           >
             <RefreshCw size={18} className={isFetchingPrices ? "animate-spin" : ""} />
             Canlı Fiyat
@@ -102,7 +210,7 @@ export const InvestmentsPage = () => {
           <button 
             onClick={handleGetAnalysis}
             disabled={isAiLoading || investments.length === 0}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[var(--color-surface-variant)]/40 border border-[var(--color-brand-secondary)]/20 text-[var(--color-brand-secondary)] rounded-full hover:bg-[var(--color-brand-secondary)]/10 font-bold transition backdrop-blur-md disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 w-full sm:w-auto bg-[var(--color-surface-variant)]/40 border border-[var(--color-brand-secondary)]/20 text-[var(--color-brand-secondary)] rounded-full hover:bg-[var(--color-brand-secondary)]/10 font-bold transition backdrop-blur-md disabled:opacity-50"
           >
             {isAiLoading ? <Sparkles size={18} className="animate-spin" /> : <Sparkles size={18} />}
             AI Analizi İste
@@ -119,8 +227,24 @@ export const InvestmentsPage = () => {
           <p className="text-[var(--color-text-main)] text-sm leading-relaxed whitespace-pre-wrap">{advice}</p>
         </div>
       )}
+
+      {debugError && (
+        <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl space-y-2">
+          <div className="flex justify-between items-center">
+             <h3 className="text-red-400 font-bold flex items-center gap-2"><ShieldAlert size={18} /> Teknik Hata Meydana Geldi</h3>
+             <button onClick={() => setDebugError(null)} className="text-red-300 hover:text-white text-xs">Gizle</button>
+          </div>
+          <p className="text-red-200/80 text-xs mb-2">Lütfen aşağıdaki hata metnini kopyalayıp asistana gönderin:</p>
+          <textarea 
+            readOnly 
+            value={debugError} 
+            className="w-full h-32 bg-black/50 text-red-300 p-3 rounded-lg border border-red-500/30 text-xs font-mono outline-none"
+            onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+          />
+        </div>
+      )}
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-1 space-y-6">
           <div className="bento-card">
             <h3 className="text-sm font-bold text-white mb-5 flex items-center gap-2 uppercase tracking-wide font-mono">
@@ -129,20 +253,32 @@ export const InvestmentsPage = () => {
             <form onSubmit={handleManualSubmit} className="space-y-5">
               <div>
                 <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Tür</label>
-                <select value={assetType} onChange={e => setAssetType(e.target.value as AssetType)} className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[var(--color-brand-primary)] transition-colors appearance-none">
+                <select value={assetType} onChange={handleAssetTypeChange} className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[var(--color-brand-primary)] transition-colors appearance-none">
                   <option value="stock">Hisse Senedi</option>
                   <option value="crypto">Kripto Para</option>
-                  <option value="gold">Altın / Emtia</option>
+                  <option value="commodity">Altın / Emtia</option>
+                  <option value="currency">Döviz</option>
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                  <div>
-                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">İsim</label>
-                  <input type="text" required value={name} onChange={e => setName(e.target.value)} placeholder="Örn: Bitcoin" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[var(--color-brand-primary)] transition-colors" />
+                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">İsim / Varlık</label>
+                  <select 
+                    required 
+                    value={symbol} 
+                    onChange={handleAssetSelect} 
+                    disabled={isFetchingPrices}
+                    className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[var(--color-brand-primary)] transition-colors appearance-none disabled:opacity-50"
+                  >
+                    <option value="" disabled>Seçiniz</option>
+                    {ASSET_OPTIONS[assetType]?.map(opt => (
+                      <option key={opt.symbol} value={opt.symbol}>{opt.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Sembol</label>
-                  <input type="text" required value={symbol} onChange={e => setSymbol(e.target.value)} placeholder="BTC" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[var(--color-brand-primary)] transition-colors" />
+                  <input type="text" required value={symbol} readOnly className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)]/50 text-[var(--color-text-variant)] border border-white/5 rounded-xl outline-none cursor-not-allowed" placeholder="Oto." />
                 </div>
               </div>
               <div>
@@ -151,15 +287,25 @@ export const InvestmentsPage = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Maliyet</label>
-                  <input type="number" step="0.01" required value={avgPrice} onChange={e => setAvgPrice(e.target.value)} className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[var(--color-brand-primary)] transition-colors" />
+                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Maliyet <span className="text-[9px] opacity-70 normal-case">(Opsiyonel)</span></label>
+                  <input type="number" step="0.01" value={avgPrice} onChange={e => setAvgPrice(e.target.value)} placeholder="Boşsa fiyata eşitlenir" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[var(--color-brand-primary)] transition-colors" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Güncel Fiyat</label>
-                  <input type="number" step="0.01" required value={currentPrice} onChange={e => setCurrentPrice(e.target.value)} className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[var(--color-brand-primary)] transition-colors" />
+                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Güncel Fiyat <span className="text-[9px] opacity-70 normal-case">(Opsiyonel)</span></label>
+                  <input type="number" step="0.01" value={currentPrice} onChange={e => setCurrentPrice(e.target.value)} placeholder="Oto. Çekilir" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[var(--color-brand-primary)] transition-colors" />
                 </div>
               </div>
               
+              {quantity && (avgPrice || currentPrice) && (
+                <div className="bg-[var(--color-brand-primary)]/5 p-4 rounded-xl border border-[var(--color-brand-primary)]/20 flex items-center justify-between">
+                  <span className="text-xs font-bold text-[var(--color-brand-primary)] font-mono uppercase tracking-wider">Toplam Gösterge</span>
+                  <div className="text-right">
+                    <p className="font-black text-white font-mono text-lg">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format((parseFloat(quantity) || 0) * (avgPrice === '' ? (parseFloat(currentPrice) || 0) : parseFloat(avgPrice)))}</p>
+                    <p className="text-[10px] text-[var(--color-text-variant)] font-mono uppercase opacity-70">Beklenen / Toplam Tutar</p>
+                  </div>
+                </div>
+              )}
+
               <button type="submit" className="w-full primary-gradient-btn rounded-xl py-3 font-bold">
                 Portföye Ekle
               </button>
@@ -168,16 +314,16 @@ export const InvestmentsPage = () => {
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-           <div className="grid grid-cols-2 gap-6">
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div className="bento-card">
                  <p className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono mb-2">Toplam Portföy Değeri</p>
-                 <h2 className="text-3xl font-black text-white font-display tracking-tight mt-1">
+                 <h2 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight mt-1">
                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalValue)}
                  </h2>
               </div>
               <div className="bento-card">
                  <p className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono mb-2">Toplam Kâr / Zarar</p>
-                 <h2 className={`text-3xl font-black font-display tracking-tight mt-1 ${isProfit ? 'text-[var(--color-brand-primary)]' : 'text-[#ffb4ab]'}`}>
+                 <h2 className={`text-2xl sm:text-3xl font-black font-display tracking-tight mt-1 ${isProfit ? 'text-[var(--color-brand-primary)]' : 'text-[#ffb4ab]'}`}>
                    {isProfit ? '+' : ''}{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalProfit)}
                  </h2>
               </div>
@@ -193,43 +339,187 @@ export const InvestmentsPage = () => {
             ) : investments.length === 0 ? (
                <div className="p-12 text-center text-[var(--color-text-variant)]">Henüz yatırım bulunmuyor.</div>
             ) : (
-              <ul className="divide-y divide-white/5 max-h-[500px] overflow-y-auto">
-                {investments.map((inv, idx) => {
-                  const currentValue = inv.quantity * inv.current_price;
-                  const costValue = inv.quantity * inv.avg_price;
-                  const profit = currentValue - costValue;
-                  const profitPerc = costValue > 0 ? ((currentValue - costValue) / costValue) * 100 : 0;
-                  const isGain = profit >= 0;
+              <div className="max-h-[600px] overflow-y-auto">
+                {(Object.keys(groupedInvestments) as AssetType[]).map((type) => (
+                  <div key={type} className="mb-4 last:mb-0">
+                    <div className="px-6 py-2.5 bg-[var(--color-surface-lowest)]/80 border-y border-white/5 flex items-center gap-2 sticky top-0 z-10 backdrop-blur-sm">
+                      <h4 className="font-bold text-[var(--color-brand-secondary)] uppercase tracking-widest text-[10px] font-mono">{assetLabels[type]}</h4>
+                    </div>
+                    <ul className="divide-y divide-white/5">
+                      {groupedInvestments[type].map((inv, idx) => {
+                        const currentValue = inv.quantity * inv.current_price;
+                        const hasCost = inv.avg_price !== null;
+                        const costValue = hasCost ? inv.quantity * (inv.avg_price as number) : 0;
+                        const profit = hasCost ? currentValue - costValue : 0;
+                        const profitPerc = costValue > 0 ? ((currentValue - costValue) / costValue) * 100 : 0;
+                        const isGain = profit >= 0;
 
-                  return (
-                    <li key={inv.id} className={`p-5 hover:bg-[var(--color-surface-container)] transition-colors flex items-center justify-between group ${idx % 2 === 0 ? 'bg-[var(--color-surface-lowest)]' : 'bg-transparent'}`}>
-                      <div className="flex items-center gap-5">
-                        <div className="bg-[var(--color-brand-secondary)]/10 text-[var(--color-brand-secondary)] p-3 rounded-2xl shadow-[inset_0_0_10px_rgba(173,198,255,0.1)]">
-                          <LineChart size={24} strokeWidth={2.5}/>
-                        </div>
-                        <div>
-                          <p className="font-bold text-white text-base font-display">{inv.name} <span className="text-[10px] text-[var(--color-brand-secondary)] border border-[var(--color-brand-secondary)]/30 px-2 py-0.5 rounded-md ml-2 font-mono">{inv.symbol}</span></p>
-                          <p className="text-xs text-[var(--color-text-variant)] mt-1 font-mono">Miktar: <strong className="text-white">{inv.quantity}</strong> • Maliyet: {inv.avg_price} ₺</p>
-                        </div>
-                      </div>
-                      <div className="text-right flex items-center gap-5">
-                        <div>
-                          <p className="font-black font-mono text-lg text-white">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(currentValue)}</p>
-                          <p className={`text-xs font-bold font-mono tracking-wider ${isGain ? 'text-[var(--color-brand-primary)]' : 'text-[#ffb4ab]'}`}>
-                            {isGain ? '+' : ''}{profitPerc.toFixed(2)}% ({isGain ? '+' : ''}{Math.round(profit)} ₺)
-                          </p>
-                        </div>
-                        <button 
-                          onClick={() => deleteInvestment(inv.id)}
-                          className="p-2.5 text-[var(--color-text-variant)] hover:text-[#ff7886] hover:bg-[#ffb4ab]/10 rounded-xl transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
+                        return (
+                          <div key={inv.id}>
+                          <li className={`relative p-4 md:p-5 hover:bg-[var(--color-surface-container)] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group ${idx % 2 === 0 ? 'bg-[var(--color-surface-lowest)]' : 'bg-transparent'}`}>
+                            <div className="flex items-center gap-4 md:gap-5">
+                              <div className="bg-[var(--color-brand-secondary)]/10 text-[var(--color-brand-secondary)] p-3 rounded-2xl shadow-[inset_0_0_10px_rgba(173,198,255,0.1)] shrink-0">
+                                <LineChart size={24} strokeWidth={2.5}/>
+                              </div>
+                              <div>
+                                <p className="font-bold text-white text-base font-display">{inv.name} <span className="text-[10px] text-[var(--color-brand-secondary)] border border-[var(--color-brand-secondary)]/30 px-2 py-0.5 rounded-md ml-2 font-mono break-all line-clamp-1 truncate sm:inline-block">{inv.symbol}</span></p>
+                                <div className="text-xs text-[var(--color-text-variant)] mt-1.5 font-mono flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span>Miktar: <strong className="text-white">{inv.quantity}</strong></span>
+                                  <span className="opacity-40 hidden sm:inline">•</span>
+                                  <span>Maliyet: <strong className="text-white">{hasCost ? `${parseFloat(inv.avg_price as unknown as string).toFixed(2)} ₺` : 'Yok'}</strong></span>
+                                  <span className="opacity-40 hidden sm:inline">•</span>
+                                  <span className="text-[var(--color-brand-secondary)] drop-shadow-[0_0_8px_rgba(173,198,255,0.3)]">Güncel: <strong>{inv.current_price.toFixed(2)} ₺</strong></span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-left sm:text-right flex items-center justify-between sm:justify-end gap-5 w-full sm:w-auto mt-2 sm:mt-0">
+                              <div>
+                                <p className="font-black font-mono text-lg text-white">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(currentValue)}</p>
+                                {hasCost ? (
+                                  <p className={`text-xs font-bold font-mono tracking-wider ${isGain ? 'text-[var(--color-brand-primary)]' : 'text-[#ffb4ab]'}`}>
+                                    {isGain ? '+' : ''}{profitPerc.toFixed(2)}% ({isGain ? '+' : ''}{Math.round(profit)} ₺)
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-[var(--color-text-variant)] mt-1 font-mono tracking-wider opacity-60">
+                                    Maliyetsiz
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex">
+                                <button 
+                                  onClick={() => {
+                                    if (inv.id.startsWith('vir_')) {
+                                      toast.info('Düzenli birikim miktarı aylık döngüyle otomatik artar, manuel olarak o yatırıma eklenti veya düzenleme yapılamaz.', { id: 'vir-err' });
+                                      return;
+                                    }
+                                    setEditId(null);
+                                    setQuickAddId(quickAddId === inv.id ? null : inv.id);
+                                    setQuickAddQty('');
+                                    setQuickAddPrice('');
+                                  }}
+                                  className={`p-2.5 hover:bg-[var(--color-brand-primary)]/10 rounded-xl transition-all sm:opacity-0 group-hover:opacity-100 focus:opacity-100 ${quickAddId === inv.id ? 'text-[var(--color-brand-primary)] opacity-100' : 'text-[var(--color-text-variant)] hover:text-[var(--color-brand-primary)]'}`}
+                                >
+                                  <Plus size={18} />
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    if (inv.id.startsWith('vir_')) {
+                                      toast.info('Düzenli birikimlerinizi ait olduğu bölümden (Genel Birikim, BES, vb.) güncelleyin.', { id: 'vir-err' });
+                                      return;
+                                    }
+                                    setQuickAddId(null);
+                                    if (editId === inv.id) {
+                                      setEditId(null);
+                                    } else {
+                                      setEditId(inv.id);
+                                      setEditQty(inv.quantity.toString());
+                                      setEditAvgPrice(inv.avg_price !== null ? inv.avg_price.toString() : '');
+                                      setEditCurrentPrice(inv.current_price.toString());
+                                    }
+                                  }}
+                                  className={`p-2.5 hover:bg-[var(--color-brand-secondary)]/10 rounded-xl transition-all sm:opacity-0 group-hover:opacity-100 focus:opacity-100 ${editId === inv.id ? 'text-[var(--color-brand-secondary)] opacity-100' : 'text-[var(--color-text-variant)] hover:text-[var(--color-brand-secondary)]'}`}
+                                >
+                                  <Edit2 size={18} />
+                                </button>
+                                <button 
+                                  onClick={() => deleteInvestment(inv.id)}
+                                  className="p-2.5 text-[var(--color-text-variant)] hover:text-[#ff7886] hover:bg-[#ffb4ab]/10 rounded-xl transition-all sm:opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              </div>
+                            </div>
+                          </li>
+                          
+                          {quickAddId === inv.id && !inv.id.startsWith('vir_') && (
+                            <div className="bg-[var(--color-surface-lowest)]/50 p-4 border-t border-[var(--color-brand-primary)]/10 flex flex-col sm:flex-row gap-3 items-end rounded-b-xl -mt-1 ml-4 sm:ml-12 z-0 relative animate-in fade-in slide-in-from-top-2">
+                              <div className="w-full sm:flex-1">
+                                 <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1 font-mono">Eklenen Miktar</label>
+                                 <input type="number" step="0.0001" value={quickAddQty} onChange={e => setQuickAddQty(e.target.value)} placeholder="+ Adet / Gram vb." className="w-full px-3 py-2 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-lg outline-none focus:border-[var(--color-brand-primary)] text-sm" />
+                              </div>
+                              <div className="w-full sm:flex-1">
+                                 <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1 font-mono">Birim Maliyeti (Opsiyonel)</label>
+                                 <input type="number" step="0.01" value={quickAddPrice} onChange={e => setQuickAddPrice(e.target.value)} placeholder="0.00 ₺ (Boşsa güncel fiyattan ekler)" className="w-full px-3 py-2 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-lg outline-none focus:border-[var(--color-brand-primary)] text-sm" />
+                              </div>
+                              <div className="flex gap-2 w-full sm:w-auto">
+                                <button onClick={async () => {
+                                   const addedQty = parseFloat(quickAddQty);
+                                   if (!addedQty || addedQty <= 0) {
+                                      toast.error('Geçerli pozitif bir miktar girin'); return;
+                                   }
+                                   let addedCost = quickAddPrice ? parseFloat(quickAddPrice) : inv.current_price;
+                                   if (isNaN(addedCost) || addedCost <= 0) addedCost = inv.current_price;
+                                   
+                                   const currentCostBasis = (inv.avg_price !== null ? inv.avg_price : inv.current_price) * inv.quantity;
+                                   const newCostBasis = addedCost * addedQty;
+                                   
+                                   const newTotalQty = inv.quantity + addedQty;
+                                   const newWeightedAvg = (currentCostBasis + newCostBasis) / newTotalQty;
+                                   
+                                   const { error } = await updateInvestment(inv.id, {
+                                     quantity: newTotalQty,
+                                     avg_price: newWeightedAvg
+                                   });
+                                   
+                                   if (!error) {
+                                      toast.success(`${addedQty} ${inv.symbol} Eklendi. Yeni ortalamanız: ${newWeightedAvg.toFixed(2)} ₺`);
+                                      setQuickAddId(null);
+                                   } else {
+                                      toast.error('Güncelleme başarısız: ' + error);
+                                   }
+                                }} className="px-4 py-2 bg-[var(--color-brand-primary)] text-[#002113] font-bold text-sm rounded-lg hover:bg-[#3bc49c] transition-colors flex-1 sm:flex-none">Ekle ve Ortala</button>
+                                <button onClick={() => setQuickAddId(null)} className="px-4 py-2 bg-transparent text-[var(--color-text-variant)] border border-white/10 font-bold text-sm rounded-lg hover:text-white transition-colors flex-1 sm:flex-none">İptal</button>
+                              </div>
+                            </div>
+                          )}
+
+                          {editId === inv.id && !inv.id.startsWith('vir_') && (
+                            <div className="bg-[var(--color-surface-lowest)]/50 p-4 border-t border-[var(--color-brand-secondary)]/10 flex flex-col sm:flex-row gap-3 items-end rounded-b-xl -mt-1 ml-4 sm:ml-12 z-0 relative animate-in fade-in slide-in-from-top-2">
+                              <div className="w-full sm:flex-1">
+                                 <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1 font-mono">Toplam Miktar</label>
+                                 <input type="number" step="0.0001" value={editQty} onChange={e => setEditQty(e.target.value)} className="w-full px-3 py-2 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-lg outline-none focus:border-[var(--color-brand-secondary)] text-sm" />
+                              </div>
+                              <div className="w-full sm:flex-1">
+                                 <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1 font-mono">Maliyet</label>
+                                 <input type="number" step="0.01" value={editAvgPrice} onChange={e => setEditAvgPrice(e.target.value)} placeholder="Opsiyonel" className="w-full px-3 py-2 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-lg outline-none focus:border-[var(--color-brand-secondary)] text-sm" />
+                              </div>
+                              <div className="w-full sm:flex-1">
+                                 <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1 font-mono">Güncel Fiyat</label>
+                                 <input type="number" step="0.01" value={editCurrentPrice} onChange={e => setEditCurrentPrice(e.target.value)} className="w-full px-3 py-2 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-lg outline-none focus:border-[var(--color-brand-secondary)] text-sm" />
+                              </div>
+                              <div className="flex gap-2 w-full sm:w-auto">
+                                <button onClick={async () => {
+                                   const newQty = parseFloat(editQty);
+                                   const newCurrent = parseFloat(editCurrentPrice);
+                                   const newAvg = editAvgPrice === '' ? null : parseFloat(editAvgPrice);
+                                   if (!newQty || newQty <= 0 || isNaN(newCurrent)) {
+                                      toast.error('Girdiğiniz değerleri kontrol edin.'); return;
+                                   }
+                                   
+                                   const { error } = await updateInvestment(inv.id, {
+                                     quantity: newQty,
+                                     avg_price: newAvg,
+                                     current_price: newCurrent
+                                   });
+                                   
+                                   if (!error) {
+                                      toast.success(`${inv.symbol} Güncellendi!`);
+                                      setEditId(null);
+                                   } else {
+                                      toast.error('Hata: ' + error);
+                                   }
+                                }} className="px-5 py-2 bg-[var(--color-brand-secondary)] text-[#002113] font-bold text-sm rounded-lg hover:bg-[var(--color-brand-secondary)]/80 hover:text-white transition-colors flex-1 sm:flex-none">Kaydet</button>
+                                <button onClick={() => setEditId(null)} className="px-4 py-2 bg-transparent text-[var(--color-text-variant)] border border-white/10 font-bold text-sm rounded-lg hover:text-white transition-colors flex-1 sm:flex-none">İptal</button>
+                              </div>
+                            </div>
+                          )}
+                          </div>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
