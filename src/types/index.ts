@@ -99,6 +99,7 @@ export interface BankAccount {
   tax_rate: number; // Stopaj oranı (%)
   maturity_date: string | null; // Sadece Vadeli için vade tarihi (Yıl-Ay-Gün)
   exempt_amount: number; // Sadece Günlük için boşta kalan para tutarı
+  deposit_date: string | null; // Paranın yatırıldığı tarih
   created_at: string;
 }
 
@@ -126,3 +127,32 @@ export interface BesPortfolio {
   extra_payments_total: number;
   created_at: string;
 }
+
+export interface CreditCardExpense {
+  id: string;
+  user_id: string;
+  amount: number;
+  category: string;
+  description: string | null;
+  merchant: string | null;
+  card_name: string | null;
+  card_id: string | null;
+  installments: number;
+  receipt_url: string | null;
+  date: string;
+  created_at: string;
+}
+
+export interface CreditCard {
+  id: string;
+  user_id: string;
+  name: string;
+  bank: string | null;
+  last_four: string | null;
+  payment_day: number;
+  cut_off_day: number | null;
+  card_limit: number | null;
+  color: string;
+  created_at: string;
+}
+

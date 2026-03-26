@@ -1,45 +1,93 @@
-import { groq, DEFAULT_MODEL } from './groq';
+import { groqChat } from './groq';
 import { Transaction, Budget, Goal } from '../../types';
+
+interface FinancialSnapshot {
+  currentMonthIncome: number;
+  currentMonthExpense: number;
+  totalBankValue: number;
+  totalBankInterest: number;
+  dailyInterestEarning: number;
+  portfolioValue: number;
+  savingsValue: number;
+  recurringIncome: number;
+  recurringExpense: number;
+  netWorth: number;
+}
 
 export const advisorAgent = {
   /**
-   * Generates financial advice based on a user's transactions, budgets, and goals.
+   * Generates financial advice based on comprehensive user data
    */
   getAdvice: async (
     transactions: Transaction[],
     budgets: Budget[],
-    goals: Goal[]
+    goals: Goal[],
+    snapshot?: FinancialSnapshot
   ): Promise<string> => {
     try {
-      const recentTransactions = transactions.slice(0, 50); // limit to avoid massive context
+      const recentTransactions = transactions.slice(0, 30);
       
+      // Expense categories summary
+      const expenseSummary = recentTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((acc, t) => {
+          acc[t.category] = (acc[t.category] || 0) + t.amount;
+          return acc;
+        }, {} as Record<string, number>);
+
+      const totalIncome = recentTransactions.filter(t => t.type === 'income').reduce((a, b) => a + b.amount, 0);
+      const totalExpense = recentTransactions.filter(t => t.type === 'expense').reduce((a, b) => a + b.amount, 0);
+
+      let contextBlock = '';
+      if (snapshot) {
+        contextBlock = `
+# Genel Finansal Durum
+- Net Varlık: ${snapshot.netWorth.toLocaleString('tr-TR')} ₺
+- Banka Hesapları Toplamı: ${snapshot.totalBankValue.toLocaleString('tr-TR')} ₺
+- Birikmiş Faiz Geliri: ${snapshot.totalBankInterest.toLocaleString('tr-TR')} ₺
+- Günlük Net Faiz Kazancı: ${snapshot.dailyInterestEarning.toLocaleString('tr-TR')} ₺
+- Yatırım Portföyü: ${snapshot.portfolioValue.toLocaleString('tr-TR')} ₺
+- Birikim/BES Toplamı: ${snapshot.savingsValue.toLocaleString('tr-TR')} ₺
+- Sabit Aylık Gelir: ${snapshot.recurringIncome.toLocaleString('tr-TR')} ₺
+- Sabit Aylık Gider: ${snapshot.recurringExpense.toLocaleString('tr-TR')} ₺
+`;
+      }
+
       const prompt = `
-Olarak sen bir "Kişisel Finans Danışmanı Alt-Ajanısın" (Subagent).
-Aşağıdaki kullanıcı verilerine bakarak Türkiye şartlarına uygun, kısa, motive edici ve yapıcı bir finansal tavsiye listesi sun.
-Bütçeleri aşan kategoriler varsa uyar, hedeflere giden yolda iyi ilerleniyorsa tebrik et.
-Çok uzun laf kalabalığı yapma, direkt nokta atışı ve uygulanabilir maddeler halinde olsun. Markdown kullanabilirsin.
+Sen bir Türk "Kişisel Finans Danışmanısın". Kullanıcının finansal verilerine bakarak kısa, motive edici ve pragmatik tavsiyeler ver.
+Türkiye ekonomi koşullarını (yüksek enflasyon, mevduat faizleri, altın/döviz fırsatları) göz önünde bulundur.
+Markdown formatı kullan. Maksimum 6 madde. Her madde kısa ve uygulanabilir olsun.
 
-# Son İşlemler (Sadece Özet veya İlk 50 Kayıt)
-${JSON.stringify(recentTransactions.map(t => ({ tip: t.type, miktar: t.amount, kategori: t.category, tarih: t.date })))}
+${contextBlock}
 
-# Aktif Bütçeler (Aylık)
-${JSON.stringify(budgets)}
+# Bu Ayın Özeti
+- Toplam Gelir: ${totalIncome.toLocaleString('tr-TR')} ₺
+- Toplam Gider: ${totalExpense.toLocaleString('tr-TR')} ₺
+- Net: ${(totalIncome - totalExpense).toLocaleString('tr-TR')} ₺
+- Tasarruf Oranı: %${totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome * 100).toFixed(0) : '0'}
 
-# Kullanıcı Hedefleri
-${JSON.stringify(goals)}
+# Harcama Kategorileri
+${Object.entries(expenseSummary).sort((a, b) => b[1] - a[1]).map(([k, v]) => `- ${k}: ${v.toLocaleString('tr-TR')} ₺`).join('\n')}
 
-Cevabını sadece Türkçe ve "Tavsiye:" veya "# Finansal Analizin" gibi bir başlıkla başlat. Maksimum 5 madde.
-      `.trim();
+# Bütçe Limitleri
+${budgets.length > 0 ? budgets.map(b => `- ${b.category}: Limit ${b.limit_amount.toLocaleString('tr-TR')} ₺`).join('\n') : 'Henüz bütçe belirlenmemiş.'}
 
-      const response = await groq.chat.completions.create({
-        model: DEFAULT_MODEL,
-        messages: [{ role: 'user', content: prompt }]
-      });
+# Hedefler
+${goals.length > 0 ? goals.map(g => `- ${g.name}: ${g.current_amount.toLocaleString('tr-TR')} / ${g.target_amount.toLocaleString('tr-TR')} ₺`).join('\n') : 'Henüz hedef belirlenmemiş.'}
 
-      return response.choices[0]?.message?.content || "Şu an finansal tavsiye oluşturulamadı. Lütfen tekrar deneyin.";
+Cevabını "## 📊 Finansal Analiz Raporu" başlığıyla başlat.
+`.trim();
+
+      const content = await groqChat([
+        { role: 'system', content: 'Sen Türkiye\'de yaşayan bir kullanıcıya yardım eden profesyonel bir kişisel finans danışmanısın. Kısa, net ve uygulanabilir tavsiyeler verirsin.' },
+        { role: 'user', content: prompt }
+      ]);
+
+      return content;
     } catch (error) {
-      console.error('Agent Advisor Error:', error);
-      return "Üzgünüm, şu an finansal verilerinizi analiz ederken bir sorun oluştu.";
+      console.error('Advisor Agent Error:', error);
+      const errMsg = error instanceof Error ? error.message : 'Bilinmeyen hata';
+      throw new Error(`AI analizi sırasında hata: ${errMsg}`);
     }
   }
 };

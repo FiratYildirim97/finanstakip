@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { LayoutDashboard, ReceiptText, TrendingUp, Wallet, LogOut, Sprout, CalendarDays, PiggyBank, Landmark } from 'lucide-react';
+import { LayoutDashboard, CreditCard, TrendingUp, Wallet, LogOut, Sprout, CalendarDays, PiggyBank, Landmark } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,7 +18,7 @@ export const Layout = ({ children }: LayoutProps) => {
 
   const navItems = [
     { to: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { to: '/transactions', icon: <ReceiptText size={20} />, label: 'İşlemler' },
+    { to: '/transactions', icon: <CreditCard size={20} />, label: 'Kart' },
     { to: '/recurring', icon: <CalendarDays size={20} />, label: 'Aylık' },
     { to: '/savings', icon: <PiggyBank size={20} />, label: 'Birikim' },
     { to: '/investments', icon: <TrendingUp size={20} />, label: 'Yatırımlar' },
