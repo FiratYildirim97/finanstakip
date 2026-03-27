@@ -19,7 +19,8 @@ import {
   Wallet, TrendingUp, Sparkles, RefreshCcw, ArrowDownRight, ArrowUpRight, 
   Clock, Landmark, Activity, CreditCard, PiggyBank, Target, CalendarDays,
   TrendingDown, BarChart3, Banknote, Shield, ChevronRight, DollarSign,
-  ArrowRight, Zap, AlertTriangle, CheckCircle2, Percent, Eye, Pencil
+  ArrowRight, Zap, AlertTriangle, CheckCircle2, Percent, Eye, Pencil,
+  ChevronDown, X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -81,6 +82,11 @@ export const Dashboard = () => {
   
   const [advice, setAdvice] = useState<string | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
+  const [expandedBreakdown, setExpandedBreakdown] = useState<'banks' | 'investments' | 'savings' | 'interest' | null>(null);
+
+  const toggleBreakdown = (section: 'banks' | 'investments' | 'savings' | 'interest') => {
+    setExpandedBreakdown(prev => prev === section ? null : section);
+  };
 
   const now = useMemo(() => new Date(), []);
   const formatMoney = (val: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
@@ -308,33 +314,218 @@ export const Dashboard = () => {
               </div>
             )}
 
-            {/* Mini Breakdown */}
+            {/* Mini Breakdown - Clickable */}
             <div className="grid grid-cols-2 gap-2 mt-5">
-              <div className="bg-black/5 rounded-xl p-2.5 border border-black/5">
+              <button
+                onClick={() => toggleBreakdown('banks')}
+                className={`bg-black/5 rounded-xl p-2.5 border text-left transition-all duration-200 hover:bg-black/10 hover:scale-[1.02] active:scale-[0.98] ${
+                  expandedBreakdown === 'banks' ? 'border-black/20 bg-black/10 ring-1 ring-black/10' : 'border-black/5'
+                }`}
+              >
                 <p className="text-[9px] text-black/60 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1">
                   <Landmark size={10}/> Bankalar
+                  <ChevronDown size={8} className={`ml-auto transition-transform duration-300 ${expandedBreakdown === 'banks' ? 'rotate-180' : ''}`} />
                 </p>
                 <p className="font-bold text-black font-mono text-sm">{formatCompact(totalBankValue)}</p>
-              </div>
-              <div className="bg-black/5 rounded-xl p-2.5 border border-black/5">
+              </button>
+              <button
+                onClick={() => toggleBreakdown('investments')}
+                className={`bg-black/5 rounded-xl p-2.5 border text-left transition-all duration-200 hover:bg-black/10 hover:scale-[1.02] active:scale-[0.98] ${
+                  expandedBreakdown === 'investments' ? 'border-black/20 bg-black/10 ring-1 ring-black/10' : 'border-black/5'
+                }`}
+              >
                 <p className="text-[9px] text-black/60 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1">
                   <Activity size={10}/> Yatırım
+                  <ChevronDown size={8} className={`ml-auto transition-transform duration-300 ${expandedBreakdown === 'investments' ? 'rotate-180' : ''}`} />
                 </p>
                 <p className="font-bold text-black font-mono text-sm">{formatCompact(portfolioValue)}</p>
-              </div>
-              <div className="bg-black/5 rounded-xl p-2.5 border border-black/5">
+              </button>
+              <button
+                onClick={() => toggleBreakdown('savings')}
+                className={`bg-black/5 rounded-xl p-2.5 border text-left transition-all duration-200 hover:bg-black/10 hover:scale-[1.02] active:scale-[0.98] ${
+                  expandedBreakdown === 'savings' ? 'border-black/20 bg-black/10 ring-1 ring-black/10' : 'border-black/5'
+                }`}
+              >
                 <p className="text-[9px] text-black/60 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1">
                   <PiggyBank size={10}/> Birikim
+                  <ChevronDown size={8} className={`ml-auto transition-transform duration-300 ${expandedBreakdown === 'savings' ? 'rotate-180' : ''}`} />
                 </p>
                 <p className="font-bold text-black font-mono text-sm">{formatCompact(totalVirtualValue)}</p>
-              </div>
-              <div className="bg-black/5 rounded-xl p-2.5 border border-black/5">
+              </button>
+              <button
+                onClick={() => toggleBreakdown('interest')}
+                className={`bg-black/5 rounded-xl p-2.5 border text-left transition-all duration-200 hover:bg-black/10 hover:scale-[1.02] active:scale-[0.98] ${
+                  expandedBreakdown === 'interest' ? 'border-black/20 bg-black/10 ring-1 ring-black/10' : 'border-black/5'
+                }`}
+              >
                 <p className="text-[9px] text-black/60 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1">
                   <Percent size={10}/> Faiz Geliri
+                  <ChevronDown size={8} className={`ml-auto transition-transform duration-300 ${expandedBreakdown === 'interest' ? 'rotate-180' : ''}`} />
                 </p>
                 <p className="font-bold text-black font-mono text-sm">+{formatCompact(totalBankInterest)}</p>
-              </div>
+              </button>
             </div>
+
+            {/* Expanded Detail Panel */}
+            {expandedBreakdown && (
+              <div className="mt-3 bg-black/10 rounded-xl border border-black/10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-black/5">
+                  <span className="text-[10px] font-bold text-black/70 uppercase tracking-wider">
+                    {expandedBreakdown === 'banks' && '🏦 Banka Hesapları Detayı'}
+                    {expandedBreakdown === 'investments' && '📈 Yatırım Portföyü Detayı'}
+                    {expandedBreakdown === 'savings' && '🐷 Birikim Detayı'}
+                    {expandedBreakdown === 'interest' && '💰 Faiz Geliri Detayı'}
+                  </span>
+                  <button onClick={() => setExpandedBreakdown(null)} className="text-black/40 hover:text-black/70 transition-colors">
+                    <X size={12} />
+                  </button>
+                </div>
+                <div className="px-3 py-2 max-h-[200px] overflow-y-auto custom-scrollbar space-y-1.5">
+                  
+                  {/* Banks Detail */}
+                  {expandedBreakdown === 'banks' && (
+                    bankProcessed.length > 0 ? bankProcessed.map(acc => (
+                      <div key={acc.id} className="flex items-center justify-between py-1.5 px-2 bg-black/5 rounded-lg">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
+                            acc.account_type === 'daily_deposit' ? 'bg-emerald-500/20 text-emerald-700' :
+                            acc.account_type === 'term_deposit' ? 'bg-purple-500/20 text-purple-700' :
+                            'bg-blue-500/20 text-blue-700'
+                          }`}>
+                            {acc.account_type === 'checking' ? <Wallet size={10}/> :
+                             acc.account_type === 'daily_deposit' ? <TrendingUp size={10}/> :
+                             <Clock size={10}/>}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold text-black/80 truncate max-w-[100px]">{acc.name}</p>
+                            <p className="text-[9px] text-black/50 font-mono">
+                              {acc.account_type === 'checking' ? 'Vadesiz' : acc.account_type === 'daily_deposit' ? 'Günlük' : 'Vadeli'}
+                              {acc.interest_rate ? ` • %${acc.interest_rate}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[11px] font-bold font-mono text-black/80">{formatCompact(acc.currentValue)}</p>
+                          {acc.netInterest > 0 && (
+                            <p className="text-[9px] font-mono text-emerald-700">+{formatMoney(acc.netInterest)}</p>
+                          )}
+                        </div>
+                      </div>
+                    )) : (
+                      <p className="text-[11px] text-black/50 text-center py-3">Henüz banka hesabı eklenmedi</p>
+                    )
+                  )}
+
+                  {/* Investments Detail */}
+                  {expandedBreakdown === 'investments' && (
+                    investments.length > 0 ? investments.map(inv => {
+                      const value = inv.quantity * inv.current_price;
+                      const cost = inv.quantity * (inv.avg_price || inv.current_price);
+                      const pnl = value - cost;
+                      const pnlPct = cost > 0 ? (pnl / cost) * 100 : 0;
+                      return (
+                        <div key={inv.id} className="flex items-center justify-between py-1.5 px-2 bg-black/5 rounded-lg">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
+                              inv.asset_type === 'stock' ? 'bg-blue-500/20 text-blue-700' :
+                              inv.asset_type === 'crypto' ? 'bg-orange-500/20 text-orange-700' :
+                              inv.asset_type === 'commodity' ? 'bg-yellow-500/20 text-yellow-700' :
+                              'bg-green-500/20 text-green-700'
+                            }`}>
+                              <Activity size={10}/>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-bold text-black/80 truncate max-w-[100px]">{inv.name}</p>
+                              <p className="text-[9px] text-black/50 font-mono">{inv.symbol} • {inv.quantity.toFixed(inv.asset_type === 'crypto' ? 4 : 2)} adet</p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-[11px] font-bold font-mono text-black/80">{formatCompact(value)}</p>
+                            <p className={`text-[9px] font-mono font-bold ${pnl >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                              {pnl >= 0 ? '+' : ''}{formatCompact(pnl)} ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%)
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }) : (
+                      <p className="text-[11px] text-black/50 text-center py-3">Henüz yatırım eklenmedi</p>
+                    )
+                  )}
+
+                  {/* Savings Detail */}
+                  {expandedBreakdown === 'savings' && (
+                    combinedSavings.length > 0 ? combinedSavings.map(sav => {
+                      const value = sav.quantity * sav.current_price;
+                      return (
+                        <div key={sav.id} className="flex items-center justify-between py-1.5 px-2 bg-black/5 rounded-lg">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 bg-pink-500/20 text-pink-700">
+                              <PiggyBank size={10}/>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-bold text-black/80 truncate max-w-[100px]">{sav.name}</p>
+                              <p className="text-[9px] text-black/50 font-mono">{sav.symbol}</p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-[11px] font-bold font-mono text-black/80">{formatCompact(value)}</p>
+                          </div>
+                        </div>
+                      );
+                    }) : (
+                      <p className="text-[11px] text-black/50 text-center py-3">Henüz birikim eklenmedi</p>
+                    )
+                  )}
+
+                  {/* Interest Detail */}
+                  {expandedBreakdown === 'interest' && (
+                    bankProcessed.filter(a => a.netInterest > 0).length > 0 ? 
+                    bankProcessed.filter(a => a.netInterest > 0).map(acc => (
+                      <div key={acc.id} className="flex items-center justify-between py-1.5 px-2 bg-black/5 rounded-lg">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 bg-emerald-500/20 text-emerald-700">
+                            <Percent size={10}/>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold text-black/80 truncate max-w-[100px]">{acc.name}</p>
+                            <p className="text-[9px] text-black/50 font-mono">
+                              %{acc.interest_rate} • {acc.daysAccrued} gün
+                              {acc.account_type === 'term_deposit' && acc.maturity_date && daysUntil(acc.maturity_date, now) > 0
+                                ? ` • ${daysUntil(acc.maturity_date, now)}g kaldı`
+                                : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[11px] font-bold font-mono text-emerald-700">+{formatMoney(acc.netInterest)}</p>
+                          <p className="text-[9px] text-black/50 font-mono">günlük: +{formatMoney(
+                            acc.account_type === 'daily_deposit'
+                              ? (Math.max(0, acc.balance - acc.exempt_amount) * ((acc.interest_rate || 0) / 100) / 365) * (1 - (acc.tax_rate || 0) / 100)
+                              : (acc.balance * ((acc.interest_rate || 0) / 100) / 365) * (1 - (acc.tax_rate || 0) / 100)
+                          )}</p>
+                        </div>
+                      </div>
+                    )) : (
+                      <p className="text-[11px] text-black/50 text-center py-3">Faiz geliri olan hesap bulunmuyor</p>
+                    )
+                  )}
+                </div>
+                {/* Footer with navigation */}
+                <div className="px-3 py-2 border-t border-black/5">
+                  <button
+                    onClick={() => {
+                      if (expandedBreakdown === 'banks') navigate('/banks');
+                      else if (expandedBreakdown === 'investments') navigate('/investments');
+                      else if (expandedBreakdown === 'savings') navigate('/net-worth');
+                      else if (expandedBreakdown === 'interest') navigate('/banks');
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold text-black/60 hover:text-black transition-colors rounded-lg hover:bg-black/5"
+                  >
+                    Detaylı Görüntüle <ChevronRight size={10} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
