@@ -9,10 +9,16 @@ export const useCreditCards = () => {
   /**
    * Bir kartın bu ayki toplam harcamasını hesapla
    */
-  const getCardMonthlyTotal = (cardId: string, expenses: { card_id: string | null; amount: number; date: string }[]) => {
+  const getCardMonthlyTotal = (cardId: string, expenses: { card_id: string | null; amount: number; date: string; installments?: number }[]) => {
     return expenses
       .filter(e => e.card_id === cardId)
-      .reduce((sum, e) => sum + e.amount, 0);
+      .reduce((sum, e) => {
+        // Taksitli harcamalarda sadece aylık taksit tutarını yansıt
+        if (e.installments && e.installments > 1) {
+          return sum + (e.amount / e.installments);
+        }
+        return sum + e.amount;
+      }, 0);
   };
 
   /**

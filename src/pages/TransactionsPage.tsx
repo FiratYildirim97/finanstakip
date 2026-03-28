@@ -432,7 +432,8 @@ export const TransactionsPage = () => {
   })();
 
   const expensesBySelectedCardCategory = cardFilteredExpenses.reduce<Record<string, number>>((acc, expense) => {
-    acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+    const effectiveAmount = expense.installments > 1 ? expense.amount / expense.installments : expense.amount;
+    acc[expense.category] = (acc[expense.category] || 0) + effectiveAmount;
     return acc;
   }, {});
 
