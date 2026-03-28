@@ -1,21 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Investment } from '../types';
-import { useRecurringTransactions } from './useRecurringTransactions';
-import { useGoldDays } from './useGoldDays';
-import { useBesPortfolios } from './useBesPortfolios';
+import { useData } from '../context/DataContext';
 import { fetchLivePrices } from '../lib/marketData';
 
 export const useVirtualSavings = () => {
-  const { recurring, loading: recurringLoading } = useRecurringTransactions();
-  const { goldDays, loading: goldLoading } = useGoldDays();
-  const { bes, loading: besLoading } = useBesPortfolios();
+  const { recurring, goldDays, besPortfolios: bes, loading: dataLoading } = useData();
 
   const [combinedSavings, setCombinedSavings] = useState<Investment[]>([]);
   const [totalVirtualValue, setTotalVirtualValue] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (recurringLoading || goldLoading || besLoading) {
+    if (dataLoading) {
        setLoading(true);
        return;
     }
@@ -88,9 +84,9 @@ export const useVirtualSavings = () => {
          iterDate.setMonth(iterDate.getMonth() + 1);
       }
 
-      const totalPrincipial = b.initial_amount + (paidMonths * b.monthly_payment) + b.extra_payments_total;
+      const totalPrincipal = b.initial_amount + (paidMonths * b.monthly_payment) + b.extra_payments_total;
       const matchValue = ((paidMonths * b.monthly_payment) + b.extra_payments_total) * (b.state_contribution_rate / 100);
-      const totalAccumulated = totalPrincipial + matchValue;
+      const totalAccumulated = totalPrincipal + matchValue;
 
       return {
         id: b.id,
@@ -130,7 +126,7 @@ export const useVirtualSavings = () => {
       setTotalVirtualValue(0);
       setLoading(false);
     }
-  }, [recurring, goldDays, bes, recurringLoading, goldLoading, besLoading]);
+  }, [recurring, goldDays, bes, dataLoading]);
 
   return { combinedSavings, totalVirtualValue, loading };
 };

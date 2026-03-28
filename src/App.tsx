@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useAuth } from './hooks/useAuth';
+import { DataProvider } from './context/DataContext';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
@@ -33,20 +33,22 @@ export default function App() {
   }
 
   return (
-    <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/transactions" element={<TransactionsPage />} />
-          <Route path="/investments" element={<InvestmentsPage />} />
-          <Route path="/net-worth" element={<NetWorthPage />} />
-          <Route path="/recurring" element={<RecurringTransactionsPage />} />
-          <Route path="/savings" element={<SavingsPage />} />
-          <Route path="/accounts" element={<BankAccountsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
-      <Toaster position="top-right" richColors />
-    </Router>
+    <DataProvider>
+      <Router>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="/investments" element={<InvestmentsPage />} />
+            <Route path="/net-worth" element={<NetWorthPage />} />
+            <Route path="/recurring" element={<RecurringTransactionsPage />} />
+            <Route path="/savings" element={<SavingsPage />} />
+            <Route path="/accounts" element={<BankAccountsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Layout>
+        <Toaster position="top-right" richColors />
+      </Router>
+    </DataProvider>
   );
 }

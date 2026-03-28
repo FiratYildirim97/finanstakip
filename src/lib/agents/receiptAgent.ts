@@ -6,6 +6,7 @@ export interface ParsedReceipt {
   merchant: string;
   description: string;
   items: string[];
+  installments: number;
 }
 
 const VISION_MODEL = 'llama-3.2-90b-vision-preview';
@@ -36,7 +37,8 @@ Beklenen JSON Şeması:
   "category": "uygun kategori",
   "merchant": "mağaza/işyeri adı",
   "description": "kısa bir özet",
-  "items": ["ürün 1", "ürün 2"] (eğer okunabiliyorsa, en fazla 5 tane)
+  "items": ["ürün 1", "ürün 2"] (eğer okunabiliyorsa, en fazla 5 tane),
+  "installments": taksit sayısı (eğer fişte belirtilmişse, yoksa 1)
 }`
               },
               {
@@ -67,6 +69,7 @@ Beklenen JSON Şeması:
         merchant: parsedData.merchant || '',
         description: parsedData.description || '',
         items: Array.isArray(parsedData.items) ? parsedData.items.slice(0, 5) : [],
+        installments: Number(parsedData.installments) || 1,
       };
     } catch (error) {
       console.error('Receipt Vision Parsing Error:', error);
@@ -87,15 +90,18 @@ Sadece geçerli bir JSON çıktısı ver, etrafına markdown veya backtick eklem
 
 Kategoriler: Market, Yemek, Giyim, Elektronik, Fatura, Sağlık, Ulaşım, Eğlence, Eğitim, Ev, Diğer.
 
+ÖNEMLİ: Eğer kullanıcı "taksit" veya "taksitli" ifadesi kullanıyorsa, taksit sayısını belirle (örn: "3 taksit" -> installments: 3). Belirtilmemişse installments 1 olsun.
+
 Kullanıcı Metni: "${text}"
 
 Beklenen JSON Şeması:
 {
-  "amount": toplam tutar (sayı),
+  "amount": toplam tutar (sayı, toplam tutarı yaz, taksit başına değil),
   "category": "uygun kategori",
   "merchant": "mağaza/işyeri adı (eğer belirtilmişse)",
   "description": "kısa bir özet/açıklama",
-  "items": []
+  "items": [],
+  "installments": taksit sayısı (sayı, varsayılan 1)
 }
       `.trim();
 
@@ -114,6 +120,7 @@ Beklenen JSON Şeması:
         merchant: parsedData.merchant || '',
         description: parsedData.description || text,
         items: Array.isArray(parsedData.items) ? parsedData.items : [],
+        installments: Number(parsedData.installments) || 1,
       };
     } catch (error) {
       console.error('Receipt Text Parsing Error:', error);

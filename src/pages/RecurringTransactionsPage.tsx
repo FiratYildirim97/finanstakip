@@ -1,6 +1,6 @@
 import { useState, FormEvent, useEffect, useMemo, useRef } from 'react';
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
-import { Plus, Trash2, CalendarDays, ArrowUpRight, ArrowDownRight, RefreshCcw, X, Info, Layers, ChevronDown, Pencil } from 'lucide-react';
+import { Plus, Trash2, CalendarDays, ArrowUpRight, ArrowDownRight, RefreshCcw, X, Info, Layers, ChevronDown, Pencil, Clock, AlertTriangle, CalendarCheck, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const RecurringTransactionsPage = () => {
@@ -153,13 +153,36 @@ export const RecurringTransactionsPage = () => {
   };
 
 const today = new Date();
-const currentMonth = today.getMonth();
-const currentYear = today.getFullYear();
 
-const isCurrentMonth = (dateStr: string) => {
+// 15'inden 15'ine hesaplama dönemi
+const getPeriodRange = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const day = now.getDate();
+
+  let periodStart: Date;
+  let periodEnd: Date;
+
+  if (day >= 15) {
+    // 15'i geçtiyse: bu ayın 15'i - gelecek ayın 15'i
+    periodStart = new Date(year, month, 15);
+    periodEnd = new Date(year, month + 1, 15);
+  } else {
+    // 15'inden önceyse: geçen ayın 15'i - bu ayın 15'i
+    periodStart = new Date(year, month - 1, 15);
+    periodEnd = new Date(year, month, 15);
+  }
+
+  return { periodStart, periodEnd };
+};
+
+const { periodStart, periodEnd } = getPeriodRange();
+
+const isInCurrentPeriod = (dateStr: string) => {
   if (!dateStr) return false;
   const d = new Date(dateStr);
-  return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  return d >= periodStart && d < periodEnd;
 };
 
 const getAmountInTry = (amt: number, curr: string) => {
@@ -171,8 +194,12 @@ const totalMonthlyIncome = recurring.filter(r => r.type === 'income').reduce((ac
   const tryValue = getAmountInTry(curr.amount, curr.currency || 'TRY');
   if (curr.frequency === 'monthly') return acc + tryValue;
   if (curr.frequency === 'weekly') return acc + (tryValue * 4);
-  if (curr.frequency === 'yearly') return acc + (tryValue / 12);
-  if (curr.frequency === 'once' && isCurrentMonth(curr.next_date)) return acc + tryValue;
+  if (curr.frequency === 'yearly') {
+    // Yıllık gelirin next_date'i bu 15-15 döneminde mi?
+    if (isInCurrentPeriod(curr.next_date)) return acc + tryValue;
+    return acc;
+  }
+  if (curr.frequency === 'once' && isInCurrentPeriod(curr.next_date)) return acc + tryValue;
   return acc;
 }, 0);
 
@@ -180,8 +207,11 @@ const totalMonthlyExpense = recurring.filter(r => r.type === 'expense').reduce((
   const tryValue = getAmountInTry(curr.amount, curr.currency || 'TRY');
   if (curr.frequency === 'monthly') return acc + tryValue;
   if (curr.frequency === 'weekly') return acc + (tryValue * 4);
-  if (curr.frequency === 'yearly') return acc + (tryValue / 12);
-  if (curr.frequency === 'once' && isCurrentMonth(curr.next_date)) return acc + tryValue;
+  if (curr.frequency === 'yearly') {
+    if (isInCurrentPeriod(curr.next_date)) return acc + tryValue;
+    return acc;
+  }
+  if (curr.frequency === 'once' && isInCurrentPeriod(curr.next_date)) return acc + tryValue;
   return acc;
 }, 0);
 
@@ -255,6 +285,82 @@ const totalMonthlyExpense = recurring.filter(r => r.type === 'expense').reduce((
           <ArrowDownRight size={18} /> Giderler
         </button>
       </div>
+
+      {/* Upcoming / Overdue Summary Bar */}
+      {(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const next7Days = new Date(today);
+        next7Days.setDate(next7Days.getDate() + 7);
+        
+        const overdueItems = recurring.filter(r => {
+          if (r.type !== 'expense') return false;
+          const d = new Date(r.next_date);
+          d.setHours(0, 0, 0, 0);
+          return d < today;
+        });
+        
+        const todayItems = recurring.filter(r => {
+          if (r.type !== 'expense') return false;
+          const d = new Date(r.next_date);
+          d.setHours(0, 0, 0, 0);
+          return d.getTime() === today.getTime();
+        });
+        
+        const upcomingItems = recurring.filter(r => {
+          if (r.type !== 'expense') return false;
+          const d = new Date(r.next_date);
+          d.setHours(0, 0, 0, 0);
+          return d > today && d <= next7Days;
+        }).sort((a, b) => new Date(a.next_date).getTime() - new Date(b.next_date).getTime());
+
+        const hasItems = overdueItems.length > 0 || todayItems.length > 0 || upcomingItems.length > 0;
+
+        if (!hasItems) return null;
+
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {overdueItems.length > 0 && (
+              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-red-500/20">
+                  <AlertTriangle size={18} className="text-red-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-red-400 uppercase tracking-wider">Gecikmiş</p>
+                  <p className="text-white font-black font-mono text-lg">{overdueItems.length}</p>
+                  <p className="text-[9px] text-red-300/70 font-mono">Ana sayfadan onayla</p>
+                </div>
+              </div>
+            )}
+            {todayItems.length > 0 && (
+              <div className="p-4 rounded-2xl bg-[#ffcf70]/10 border border-[#ffcf70]/20 flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-[#ffcf70]/20">
+                  <CalendarCheck size={18} className="text-[#ffcf70]" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[#ffcf70] uppercase tracking-wider">Bugün</p>
+                  <p className="text-white font-black font-mono text-lg">{todayItems.length}</p>
+                  <p className="text-[9px] text-[#ffcf70]/70 font-mono">işlem bekliyor</p>
+                </div>
+              </div>
+            )}
+            {upcomingItems.length > 0 && (
+              <div className="p-4 rounded-2xl bg-[var(--color-brand-primary)]/10 border border-[var(--color-brand-primary)]/20 flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-[var(--color-brand-primary)]/20">
+                  <Clock size={18} className="text-[var(--color-brand-primary)]" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[var(--color-brand-primary)] uppercase tracking-wider">7 Gün İçinde</p>
+                  <p className="text-white font-black font-mono text-lg">{upcomingItems.length}</p>
+                  <p className="text-[9px] text-[var(--color-brand-primary)]/70 font-mono">
+                    İlk: {new Date(upcomingItems[0].next_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {debugError && (
         <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl space-y-2">
@@ -395,24 +501,66 @@ const totalMonthlyExpense = recurring.filter(r => r.type === 'expense').reduce((
           {/* Stats Bar */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             <div className="bento-card">
-              <p className="text-[var(--color-text-variant)] font-bold text-[10px] uppercase tracking-widest font-mono mb-2">Aylık Sabit Gelir</p>
+              <p className="text-[var(--color-text-variant)] font-bold text-[10px] uppercase tracking-widest font-mono mb-2">Toplam Gelir</p>
               <h2 className="text-xl sm:text-2xl font-black text-[#4edeb3] font-display tracking-tight mt-1">
                 {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalMonthlyIncome)}
               </h2>
+              <p className="text-[9px] text-[var(--color-text-variant)] font-mono mt-1.5 opacity-70">
+                {periodStart.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} – {periodEnd.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} dönemi
+              </p>
             </div>
             <div className="bento-card">
-              <p className="text-[var(--color-text-variant)] font-bold text-[10px] uppercase tracking-widest font-mono mb-2">Aylık Sabit Gider</p>
+              <p className="text-[var(--color-text-variant)] font-bold text-[10px] uppercase tracking-widest font-mono mb-2">Toplam Gider</p>
               <h2 className="text-xl sm:text-2xl font-black text-[#ffb4ab] font-display tracking-tight mt-1">
                 {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalMonthlyExpense)}
               </h2>
+              <p className="text-[9px] text-[var(--color-text-variant)] font-mono mt-1.5 opacity-70">
+                {periodStart.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} – {periodEnd.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} dönemi
+              </p>
             </div>
             <div className="bento-card border border-[var(--color-brand-secondary)]/20 shadow-[0_10px_30px_rgba(173,198,255,0.05)]">
-              <p className="text-[var(--color-brand-secondary)] font-bold text-[10px] uppercase tracking-widest font-mono mb-2">Aylık Net Sabit Bakiye</p>
+              <p className="text-[var(--color-brand-secondary)] font-bold text-[10px] uppercase tracking-widest font-mono mb-2">Net Bakiye</p>
               <h2 className="text-xl sm:text-2xl font-black text-white font-display tracking-tight mt-1">
                 {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(netMonthly)}
               </h2>
+              <p className="text-[9px] text-[var(--color-text-variant)] font-mono mt-1.5 opacity-70">
+                {periodStart.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} – {periodEnd.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} dönemi
+              </p>
             </div>
           </div>
+
+          {/* Income vs Expense Visual Bar */}
+          {(totalMonthlyIncome > 0 || totalMonthlyExpense > 0) && (
+            <div className="bento-card">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-[#4edeb3] font-mono flex items-center gap-1.5">
+                  <ArrowUpRight size={12} /> Gelir: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalMonthlyIncome)}
+                </span>
+                <span className="text-xs font-bold text-[#ffb4ab] font-mono flex items-center gap-1.5">
+                  <ArrowDownRight size={12} /> Gider: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalMonthlyExpense)}
+                </span>
+              </div>
+              <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden flex">
+                {totalMonthlyIncome + totalMonthlyExpense > 0 && (
+                  <>
+                    <div
+                      className="h-full bg-gradient-to-r from-[#4edeb3] to-[#3bc49c] rounded-l-full transition-all"
+                      style={{ width: `${(totalMonthlyIncome / (totalMonthlyIncome + totalMonthlyExpense)) * 100}%` }}
+                    />
+                    <div
+                      className="h-full bg-gradient-to-r from-[#ff7886] to-[#ffb4ab] rounded-r-full transition-all"
+                      style={{ width: `${(totalMonthlyExpense / (totalMonthlyIncome + totalMonthlyExpense)) * 100}%` }}
+                    />
+                  </>
+                )}
+              </div>
+              <div className="flex items-center justify-center mt-2">
+                <span className={`text-xs font-bold font-mono ${netMonthly >= 0 ? 'text-[#4edeb3]' : 'text-[#ffb4ab]'}`}>
+                  Net: {netMonthly >= 0 ? '+' : ''}{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(netMonthly)}
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3">
             {loading ? (
@@ -502,8 +650,30 @@ const totalMonthlyExpense = recurring.filter(r => r.type === 'expense').reduce((
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm text-white font-medium">{rec.description || 'Açıklama yok'}</span>
                                     <span className="text-[9px] text-[var(--color-text-variant)] border border-white/10 px-1.5 py-0.5 rounded font-mono bg-white/5">{freqLabels[rec.frequency]}</span>
+                                    {/* Date Status Badge */}
+                                    {(() => {
+                                      const today = new Date();
+                                      today.setHours(0, 0, 0, 0);
+                                      const nextD = new Date(rec.next_date);
+                                      nextD.setHours(0, 0, 0, 0);
+                                      const diffDays = Math.round((nextD.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                                      
+                                      if (diffDays < 0) {
+                                        return <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-bold border border-red-500/10">{Math.abs(diffDays)} gün geçti</span>;
+                                      } else if (diffDays === 0) {
+                                        return <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#ffcf70]/15 text-[#ffcf70] font-bold border border-[#ffcf70]/10 animate-pulse">Bugün</span>;
+                                      } else if (diffDays <= 3) {
+                                        return <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 font-bold border border-orange-500/10">{diffDays} gün sonra</span>;
+                                      } else if (diffDays <= 7) {
+                                        return <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--color-brand-primary)]/10 text-[var(--color-brand-primary)] font-bold border border-[var(--color-brand-primary)]/10">{diffDays}g sonra</span>;
+                                      }
+                                      return null;
+                                    })()}
+                                    {rec.total_installments && (
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 font-bold border border-purple-500/10">{rec.total_installments} kaldı</span>
+                                    )}
                                   </div>
-                                  <p className="text-[10px] text-[var(--color-text-variant)] font-mono mt-1">{new Date(rec.next_date).toLocaleDateString('tr-TR')}</p>
+                                  <p className="text-[10px] text-[var(--color-text-variant)] font-mono mt-1">{new Date(rec.next_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <p className="font-bold font-mono text-sm" style={{ color: colorClass }}>
@@ -514,8 +684,8 @@ const totalMonthlyExpense = recurring.filter(r => r.type === 'expense').reduce((
                                     setEditAmount(String(rec.amount));
                                     setEditNextDate(rec.next_date);
                                     setEditDescription(rec.description || '');
-                                  }} className="p-1.5 text-[var(--color-text-variant)] hover:text-white opacity-0 group-hover:opacity-100"><Pencil size={13} /></button>
-                                  <button onClick={() => deleteRecurring(rec.id)} className="p-1.5 text-[var(--color-text-variant)] hover:text-red-400 opacity-0 group-hover:opacity-100"><Trash2 size={13} /></button>
+                                  }} className="p-1.5 text-[var(--color-text-variant)] hover:text-white bg-white/5 text-white lg:text-[var(--color-text-variant)] lg:bg-transparent opacity-100 lg:opacity-0 lg:group-hover:opacity-100"><Pencil size={13} /></button>
+                                  <button onClick={() => deleteRecurring(rec.id)} className="p-1.5 text-[var(--color-text-variant)] hover:text-red-400 bg-white/5 text-white lg:text-[var(--color-text-variant)] lg:bg-transparent opacity-100 lg:opacity-0 lg:group-hover:opacity-100"><Trash2 size={13} /></button>
                                 </div>
                               </div>
                             );

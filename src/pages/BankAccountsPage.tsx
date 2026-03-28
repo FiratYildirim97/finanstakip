@@ -73,6 +73,9 @@ export const BankAccountsPage = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const isSubmittingRef = React.useRef(false); // To handle quick double clicks
+
   const now = useMemo(() => new Date(), []);
 
   // Hesapları sınıflandır: vadesi dolmuş → vadesiz gibi göster
@@ -109,9 +112,10 @@ export const BankAccountsPage = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name || !balance) return;
+    if (!name || !balance || isSubmittingRef.current) return;
 
     setIsSubmitting(true);
+    isSubmittingRef.current = true;
     let errorMsg = null;
     
     const accountData = {
@@ -140,12 +144,14 @@ export const BankAccountsPage = () => {
     if (!errorMsg) {
       toast.success(editingId ? 'Hesap başarıyla güncellendi!' : 'Banka hesabı eklendi!');
       setEditingId(null);
+      setIsAddingNew(false);
       resetForm();
     } else {
       toast.error('İşlem sırasında bir hata oluştu.');
       console.error(errorMsg);
     }
     setIsSubmitting(false);
+    isSubmittingRef.current = false;
   };
 
   const resetForm = () => {
@@ -160,6 +166,7 @@ export const BankAccountsPage = () => {
 
   const handleEdit = (acc: BankAccount) => {
     setEditingId(acc.id);
+    setIsAddingNew(false);
     setName(acc.name);
     setAccountType(acc.account_type);
     setBalance(acc.balance.toString());
@@ -168,11 +175,11 @@ export const BankAccountsPage = () => {
     setMaturityDate(acc.maturity_date || '');
     setExemptAmount(acc.exempt_amount !== null && acc.exempt_amount !== undefined ? acc.exempt_amount.toString() : '0');
     setDepositDate(acc.deposit_date || '');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
+    setIsAddingNew(false);
     resetForm();
   };
 
@@ -184,6 +191,8 @@ export const BankAccountsPage = () => {
   const dailyAccounts = processedAccounts.filter(a => a.account_type === 'daily_deposit');
   const termAccounts = processedAccounts.filter(a => a.account_type === 'term_deposit' && !a.isMatured);
 
+  const isModalOpen = isAddingNew || editingId !== null;
+
   return (
     <div className="space-y-6 md:space-y-8">
       <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:items-center justify-between gap-2 md:gap-4">
@@ -192,47 +201,67 @@ export const BankAccountsPage = () => {
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6">
-          <div className="bento-card border border-[#cda4ff]/20">
-             <p className="text-[#e2c7ff] font-bold text-xs uppercase tracking-widest font-mono mb-2">Toplam Güncel Değer</p>
-             <h2 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight mt-1">
-               {fmt(totalCurrentValue)}
-             </h2>
-             <p className="text-[10px] text-[var(--color-text-variant)] mt-1 font-mono">Ana para + birikmiş faiz</p>
-          </div>
-          <div className="bento-card border border-[#4edeb3]/20">
-             <p className="text-[#4edeb3] font-bold text-xs uppercase tracking-widest font-mono mb-2">Toplam Birikmiş Faiz</p>
-             <h2 className="text-2xl sm:text-3xl font-black text-[#4edeb3] font-display tracking-tight mt-1">
-               +{fmt(totalNetInterest)}
-             </h2>
-             <p className="text-[10px] text-[var(--color-text-variant)] mt-1 font-mono">Stopaj kesilmiş net</p>
-          </div>
-          <div className="bento-card border border-[#4edeb3]/20">
-             <p className="text-[#4edeb3] font-bold text-xs uppercase tracking-widest font-mono mb-2">NET Günlük Getiri</p>
-             <h2 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight mt-1">
-               +{fmt(totalDailyInterest)}
-             </h2>
-             <p className="text-[10px] text-[var(--color-text-variant)] mt-1 font-mono">Bugünkü günlük</p>
-          </div>
-          <div className="bento-card border border-[#4edeb3]/20">
-             <p className="text-[#4edeb3] font-bold text-xs uppercase tracking-widest font-mono mb-2">Aylık NET Getiri</p>
-             <h2 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight mt-1">
-               +{fmt(totalDailyInterest * 30)}
-             </h2>
-             <p className="text-[10px] text-[var(--color-text-variant)] mt-1 font-mono">30 günlük tahmini</p>
-          </div>
+      <div className="flex flex-col xl:flex-row gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 flex-1">
+            <div className="bento-card border border-[#cda4ff]/20">
+               <p className="text-[#e2c7ff] font-bold text-xs uppercase tracking-widest font-mono mb-2">Toplam Güncel Değer</p>
+               <h2 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight mt-1">
+                 {fmt(totalCurrentValue)}
+               </h2>
+               <p className="text-[10px] text-[var(--color-text-variant)] mt-1 font-mono">Ana para + birikmiş faiz</p>
+            </div>
+            <div className="bento-card border border-[#4edeb3]/20">
+               <p className="text-[#4edeb3] font-bold text-xs uppercase tracking-widest font-mono mb-2">Toplam Birikmiş Faiz</p>
+               <h2 className="text-2xl sm:text-3xl font-black text-[#4edeb3] font-display tracking-tight mt-1">
+                 +{fmt(totalNetInterest)}
+               </h2>
+               <p className="text-[10px] text-[var(--color-text-variant)] mt-1 font-mono">Stopaj kesilmiş net</p>
+            </div>
+            <div className="bento-card border border-[#4edeb3]/20">
+               <p className="text-[#4edeb3] font-bold text-xs uppercase tracking-widest font-mono mb-2">NET Günlük Getiri</p>
+               <h2 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight mt-1">
+                 +{fmt(totalDailyInterest)}
+               </h2>
+               <p className="text-[10px] text-[var(--color-text-variant)] mt-1 font-mono">Bugünkü günlük</p>
+            </div>
+            <div className="bento-card border border-[#4edeb3]/20">
+               <p className="text-[#4edeb3] font-bold text-xs uppercase tracking-widest font-mono mb-2">Aylık NET Getiri</p>
+               <h2 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight mt-1">
+                 +{fmt(totalDailyInterest * 30)}
+               </h2>
+               <p className="text-[10px] text-[var(--color-text-variant)] mt-1 font-mono">30 günlük tahmini</p>
+            </div>
+        </div>
+        <div className="flex flex-col justify-center">
+            <button
+              onClick={() => { resetForm(); setIsAddingNew(true); }}
+              className="h-full px-8 py-4 bg-gradient-to-r from-[#cda4ff]/20 to-[#ae70fe]/20 border border-[#cda4ff]/30 text-[#cda4ff] rounded-3xl font-bold flex flex-row xl:flex-col items-center justify-center gap-3 hover:bg-[#cda4ff]/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Plus size={28} />
+              <span className="whitespace-nowrap text-lg">Hesap Ekle</span>
+            </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bento-card">
-            <h3 className="text-sm font-bold text-white mb-5 flex items-center gap-2 uppercase tracking-wide font-mono">
-              {editingId ? (
-                <><Pencil size={18} className="text-[#4edeb3]" /> Hesabı Düzenle</>
-              ) : (
-                <><Plus size={18} className="text-[#cda4ff]" /> Yeni Hesap Ekle</>
-              )}
-            </h3>
+      <div className="space-y-6">
+        
+        {/* MODAL */}
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" onClick={cancelEdit}>
+            <div 
+              className="bg-[var(--color-surface-container)] rounded-3xl w-full max-w-lg border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-white/5 bg-gradient-to-r from-[#cda4ff]/10 to-[#ae70fe]/10 flex justify-between items-center">
+                <h3 className="font-bold text-white flex items-center gap-2 text-lg">
+                  {editingId ? (
+                    <><Pencil size={20} className="text-[#4edeb3]" /> Hesabı Düzenle</>
+                  ) : (
+                    <><Plus size={20} className="text-[#cda4ff]" /> Yeni Hesap Ekle</>
+                  )}
+                </h3>
+              </div>
+              <div className="p-6 max-h-[80vh] overflow-y-auto">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Hesap Türü</label>
@@ -301,10 +330,12 @@ export const BankAccountsPage = () => {
                 )}
               </div>
             </form>
+            </div>
           </div>
-        </div>
+          </div>
+        )}
 
-        <div className="lg:col-span-2 space-y-5">
+        <div className="space-y-6 w-full mt-6">
           
           {/* Vadesi Dolmuş - Vadesiz olarak göster */}
           {maturedAccounts.length > 0 && (
@@ -353,10 +384,10 @@ export const BankAccountsPage = () => {
                         </p>
                       </div>
                       <div className="flex">
-                          <button onClick={() => handleEdit(acc)} className="p-2.5 text-[var(--color-text-variant)] hover:text-[#4edeb3] hover:bg-[#4edeb3]/10 rounded-xl transition-all sm:opacity-0 group-hover:opacity-100 focus:opacity-100">
+                          <button onClick={() => handleEdit(acc)} className="p-2.5 text-[#4edeb3] bg-[#4edeb3]/10 lg:bg-transparent lg:text-[var(--color-text-variant)] lg:hover:text-[#4edeb3] lg:hover:bg-[#4edeb3]/10 rounded-xl transition-all opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100">
                             <Pencil size={18} />
                           </button>
-                          <button onClick={() => deleteAccount(acc.id)} className="p-2.5 text-[var(--color-text-variant)] hover:text-[#ff7886] hover:bg-[#ffb4ab]/10 rounded-xl transition-all sm:opacity-0 group-hover:opacity-100 focus:opacity-100">
+                          <button onClick={() => deleteAccount(acc.id)} className="p-2.5 text-[#ff7886] bg-[#ffb4ab]/10 lg:bg-transparent lg:text-[var(--color-text-variant)] lg:hover:text-[#ff7886] lg:hover:bg-[#ffb4ab]/10 rounded-xl transition-all opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100">
                             <Trash2 size={18} />
                           </button>
                       </div>
@@ -531,10 +562,10 @@ function AccountGroup({ title, subtitle, icon, accounts, onEdit, onDelete, fmt, 
                   )}
                 </div>
                 <div className="flex">
-                    <button onClick={() => onEdit(acc)} className="p-2.5 text-[var(--color-text-variant)] hover:text-[#4edeb3] hover:bg-[#4edeb3]/10 rounded-xl transition-all sm:opacity-0 group-hover:opacity-100 focus:opacity-100">
+                    <button onClick={() => onEdit(acc)} className="p-2.5 text-[#4edeb3] bg-[#4edeb3]/10 lg:bg-transparent lg:text-[var(--color-text-variant)] lg:hover:text-[#4edeb3] lg:hover:bg-[#4edeb3]/10 rounded-xl transition-all opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100">
                       <Pencil size={18} />
                     </button>
-                    <button onClick={() => onDelete(acc.id)} className="p-2.5 text-[var(--color-text-variant)] hover:text-[#ff7886] hover:bg-[#ffb4ab]/10 rounded-xl transition-all sm:opacity-0 group-hover:opacity-100 focus:opacity-100">
+                    <button onClick={() => onDelete(acc.id)} className="p-2.5 text-[#ff7886] bg-[#ffb4ab]/10 lg:bg-transparent lg:text-[var(--color-text-variant)] lg:hover:text-[#ff7886] lg:hover:bg-[#ffb4ab]/10 rounded-xl transition-all opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100">
                       <Trash2 size={18} />
                     </button>
                 </div>
