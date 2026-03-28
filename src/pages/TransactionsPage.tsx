@@ -49,7 +49,7 @@ const CATEGORY_EMOJIS: Record<string, string> = {
 type InputMode = 'ai-text' | 'ai-photo' | 'manual';
 
 export const TransactionsPage = () => {
-  const { expenses, loading, addExpense, deleteExpense, uploadReceipt, totalExpenses, expensesByCategory } = useCreditCardExpenses();
+  const { expenses, loading, addExpense, deleteExpense, uploadReceipt } = useCreditCardExpenses();
   const { cards, addCard, deleteCard, syncCardToRecurring, getCardMonthlyTotal } = useCreditCards();
 
   // Input mode 
@@ -94,6 +94,7 @@ export const TransactionsPage = () => {
 
   // Filter
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
+  const [filterCardId, setFilterCardId] = useState<string | null>(null);
 
   // Card management modal
   const [showCardModal, setShowCardModal] = useState(false);
@@ -356,12 +357,86 @@ export const TransactionsPage = () => {
   };
 
   // Filtered expenses
-  const filteredExpenses = selectedFilter === 'all'
-    ? expenses
-    : expenses.filter(e => e.category === selectedFilter);
+  const selectedCard = cards.find(c => c.id === filterCardId);
 
-  // Top categories for summary
-  const sortedCategories = Object.entries(expensesByCategory)
+  const cardFilteredExpenses = filterCardId
+    ? expenses.filter(e => e.card_id === filterCardId)
+    : expenses;
+
+  const filteredExpenses = selectedFilter === 'all'
+    ? cardFilteredExpenses
+    : cardFilteredExpenses.filter(e => e.category === selectedFilter);
+
+  const filteredTotalExpenses = cardFilteredExpenses.reduce((sum, expense) => {
+    if (expense.installments > 1) {
+      // Taksitli olunca sadece o aya yansıyan (ilk) taksit tutarını yansıt
+      return sum + (expense.amount / expense.installments);
+    }
+    return sum + expense.amount;
+  }, 0);
+
+  const installmentExpenses = cardFilteredExpenses.filter(e => e.installments > 1);
+
+  const installmentGroups = installmentExpenses.reduce((groups, expense) => {
+    const groupKey = expense.card_id || 'no-card';
+    if (!groups[groupKey]) {
+      groups[groupKey] = {
+        cardName: expense.card_name || 'Kartı Belirsiz',
+        items: [],
+      };
+    }
+    groups[groupKey].items.push(expense);
+    return groups;
+  }, {} as Record<string, { cardName: string; items: typeof installmentExpenses }>);
+
+  // Ay bazlı gelecek taksitler hesaplama
+  const futureMonthlyInstallments = (() => {
+    const monthlyData: Record<string, { total: number; label: string; items: any[] }> = {};
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    expenses.forEach(expense => {
+      if (expense.installments <= 1) return;
+
+      const startDate = new Date(expense.date);
+      const amountPerInstallment = expense.amount / expense.installments;
+
+      for (let i = 0; i < expense.installments; i++) {
+        const installmentDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+
+        // Sadece bu ay ve gelecek ayları ekle
+        if (installmentDate >= currentMonthStart) {
+          const monthKey = installmentDate.toISOString().substring(0, 7); // "YYYY-MM"
+          const monthLabel = installmentDate.toLocaleString('tr-TR', { month: 'long', year: 'numeric' });
+
+          if (!monthlyData[monthKey]) {
+            monthlyData[monthKey] = { total: 0, label: monthLabel, items: [] };
+          }
+
+          monthlyData[monthKey].total += amountPerInstallment;
+          monthlyData[monthKey].items.push({
+            ...expense,
+            currentInstallmentNumber: i + 1,
+            monthlyAmount: amountPerInstallment
+          });
+        }
+      }
+    });
+
+    return Object.keys(monthlyData)
+      .sort()
+      .map(key => ({
+        key,
+        ...monthlyData[key]
+      }));
+  })();
+
+  const expensesBySelectedCardCategory = cardFilteredExpenses.reduce<Record<string, number>>((acc, expense) => {
+    acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+    return acc;
+  }, {});
+
+  const sortedCategories = Object.entries(expensesBySelectedCardCategory)
     .sort(([, a], [, b]) => (b as number) - (a as number))
     .slice(0, 5);
 
@@ -378,6 +453,11 @@ export const TransactionsPage = () => {
           </h1>
           <p className="text-[var(--color-text-variant)] mt-2 text-sm">
             Harcamalarınızı AI ile yazı veya fiş fotoğrafı ile kolayca ekleyin
+            {selectedCard && (
+              <span className="block mt-1 text-xs text-purple-300">
+                Görüntülenen kart: {selectedCard.name}
+              </span>
+            )}
           </p>
         </div>
 
@@ -386,7 +466,7 @@ export const TransactionsPage = () => {
           <div>
             <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Toplam Harcama</p>
             <p className="text-2xl font-black text-white font-mono mt-0.5">
-              {new Intl.NumberFormat('tr-TR').format(totalExpenses)} <span className="text-[var(--color-brand-tertiary)] text-lg">₺</span>
+              {new Intl.NumberFormat('tr-TR').format(filteredTotalExpenses)} <span className="text-[var(--color-brand-tertiary)] text-lg">₺</span>
             </p>
           </div>
         </div>
@@ -427,16 +507,33 @@ export const TransactionsPage = () => {
           </button>
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {/* All Cards Option */}
+            <div
+              onClick={() => setFilterCardId(null)}
+              className={`relative min-w-[120px] p-4 rounded-2xl cursor-pointer transition-all shrink-0 flex flex-col items-center justify-center gap-2 border border-white/10 ${!filterCardId
+                ? 'bg-white/10 ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]'
+                : 'bg-white/5 hover:bg-white/10'
+                }`}
+            >
+              <div className="p-2 rounded-xl bg-white/10">
+                <Wallet size={16} className="text-white" />
+              </div>
+              <span className="text-xs font-bold text-white">Tüm Kartlar</span>
+            </div>
+
             {cards.map(card => {
               const cardTotal = getCardMonthlyTotal(card.id, expenses);
               const usagePercent = card.card_limit ? Math.min((cardTotal / card.card_limit) * 100, 100) : 0;
               return (
                 <div
                   key={card.id}
-                  onClick={() => setSelectedCardId(card.id)}
-                  className={`relative min-w-[200px] p-4 rounded-2xl cursor-pointer transition-all shrink-0 group ${selectedCardId === card.id
-                      ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]'
-                      : 'hover:scale-[1.02]'
+                  onClick={() => {
+                    setFilterCardId(card.id);
+                    setSelectedCardId(card.id);
+                  }}
+                  className={`relative min-w-[200px] p-4 rounded-2xl cursor-pointer transition-all shrink-0 group ${filterCardId === card.id
+                    ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]'
+                    : 'hover:scale-[1.02]'
                     }`}
                   style={{
                     background: `linear-gradient(135deg, ${card.color}20, ${card.color}05)`,
@@ -1126,12 +1223,12 @@ export const TransactionsPage = () => {
           <div>
             <h2 className="text-xl font-bold text-white">Gelecek Taksitler</h2>
             <p className="text-xs text-[var(--color-text-variant)]">
-              {expenses.filter(e => e.installments > 1).length} aktif taksitli işlemin aylık dağılımı
+              {installmentExpenses.length} aktif taksitli işlemin aylık dağılımı
             </p>
           </div>
         </div>
 
-        {expenses.filter(e => e.installments > 1).length === 0 ? (
+        {installmentExpenses.length === 0 ? (
           <div className="p-12 text-center flex flex-col items-center gap-4 bg-white/[0.02] rounded-2xl border border-white/5">
             <div className="p-5 rounded-3xl bg-purple-500/5 border border-purple-500/10">
               <List size={40} className="text-purple-400/40" />
@@ -1146,7 +1243,6 @@ export const TransactionsPage = () => {
         ) : (
           <>
             {(() => {
-              const installmentExpenses = expenses.filter(e => e.installments > 1);
               const totalInstallmentAmount = installmentExpenses.reduce((sum, e) => sum + e.amount, 0);
               const monthlyInstallmentAmount = installmentExpenses.reduce((sum, e) => sum + (e.amount / e.installments), 0);
               return (
@@ -1168,83 +1264,108 @@ export const TransactionsPage = () => {
             })()}
 
             <div className="space-y-4">
-              {expenses.filter(e => e.installments > 1).map((expense, idx) => {
-                const monthlyAmount = expense.amount / expense.installments;
-                const expenseDate = new Date(expense.date);
-                const now = new Date();
-                const monthsPassed = Math.max(1, (now.getFullYear() - expenseDate.getFullYear()) * 12 + (now.getMonth() - expenseDate.getMonth()) + 1);
-                const paidInstallments = Math.min(monthsPassed, expense.installments);
-                const remainingInstallments = expense.installments - paidInstallments;
-                const progressPercent = (paidInstallments / expense.installments) * 100;
-                const isCompleted = remainingInstallments <= 0;
-
-                return (
-                  <div
-                    key={expense.id}
-                    className={`p-5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-purple-500/20 hover:bg-white/[0.04] transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isCompleted ? 'opacity-60 grayscale' : ''}`}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div
-                        className="p-3 rounded-2xl shrink-0 text-xl"
-                        style={{
-                          backgroundColor: `${CATEGORY_COLORS[expense.category] || '#94a3b8'}15`,
-                        }}
-                      >
-                        {CATEGORY_EMOJIS[expense.category] || '📦'}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-bold text-white text-base">{expense.merchant || expense.category}</p>
-                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg ${isCompleted ? 'bg-green-500/15 text-green-400 border border-green-500/10' : 'bg-purple-500/15 text-purple-300 border border-purple-500/10'}`}>
-                            {isCompleted ? '✓ Tamamlandı' : `${paidInstallments}/${expense.installments} Taksit`}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-[var(--color-text-variant)] mt-1 font-mono flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <Calendar size={10} />
-                            {expense.date}
-                          </span>
-                          {expense.card_name && (
-                            <>
-                              <span className="text-white/20">•</span>
-                              <span className="flex items-center gap-1">
-                                <CreditCard size={10} />
-                                {expense.card_name}
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        <div className="mt-3 max-w-[200px] w-full">
-                          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${isCompleted ? 'bg-green-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}
-                              style={{ width: `${progressPercent}%` }}
-                            />
-                          </div>
-                          <div className="flex justify-between mt-1 text-[10px] text-[var(--color-text-variant)] font-mono">
-                            <span>{paidInstallments} ödendi</span>
-                            <span>{remainingInstallments > 0 ? `${remainingInstallments} kaldı` : 'Bitti'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-left md:text-right w-full md:w-auto">
-                      <p className="text-xl font-black font-mono text-white">
-                        {new Intl.NumberFormat('tr-TR').format(expense.amount)} <span className="text-[var(--color-brand-tertiary)] text-sm">₺</span>
-                      </p>
-                      <p className="text-xs text-pink-400 font-mono mt-0.5 flex items-center md:justify-end gap-1">
-                        <Clock size={10} />
-                        Aylık: {new Intl.NumberFormat('tr-TR').format(monthlyAmount)} ₺
-                      </p>
-                    </div>
+              {Object.entries(installmentGroups).map(([groupKey, group]) => (
+                <div key={groupKey} className="space-y-3">
+                  <div className="flex items-center gap-2 px-1">
+                    <CreditCard size={13} className="text-purple-300" />
+                    <p className="text-sm font-semibold text-purple-200">{group.cardName}</p>
+                    <span className="text-[10px] text-[var(--color-text-variant)] font-mono">
+                      ({group.items.length} işlem)
+                    </span>
                   </div>
-                );
-              })}
+                  {group.items.map((expense) => {
+                    const monthlyAmount = expense.amount / expense.installments;
+                    const expenseDate = new Date(expense.date);
+                    const now = new Date();
+                    const monthsPassed = Math.max(1, (now.getFullYear() - expenseDate.getFullYear()) * 12 + (now.getMonth() - expenseDate.getMonth()) + 1);
+                    const paidInstallments = Math.min(monthsPassed, expense.installments);
+                    const remainingInstallments = expense.installments - paidInstallments;
+                    const progressPercent = (paidInstallments / expense.installments) * 100;
+                    const isCompleted = remainingInstallments <= 0;
+
+                    return (
+                      <div
+                        key={expense.id}
+                        className={`p-5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-purple-500/20 hover:bg-white/[0.04] transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isCompleted ? 'opacity-60 grayscale' : ''}`}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div
+                            className="p-3 rounded-2xl shrink-0 text-xl"
+                            style={{
+                              backgroundColor: `${CATEGORY_COLORS[expense.category] || '#94a3b8'}15`,
+                            }}
+                          >
+                            {CATEGORY_EMOJIS[expense.category] || '📦'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-white text-base">{expense.merchant || expense.category}</p>
+                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg ${isCompleted ? 'bg-green-500/15 text-green-400 border border-green-500/10' : 'bg-purple-500/15 text-purple-300 border border-purple-500/10'}`}>
+                                {isCompleted ? '✓ Tamamlandı' : `${paidInstallments}/${expense.installments} Taksit`}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-[var(--color-text-variant)] mt-1 font-mono flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <Calendar size={10} />
+                                {expense.date}
+                              </span>
+                              {expense.card_name && (
+                                <>
+                                  <span className="text-white/20">•</span>
+                                  <span className="flex items-center gap-1">
+                                    <CreditCard size={10} />
+                                    {expense.card_name}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+
+                            <div className="mt-3 max-w-[200px] w-full">
+                              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${isCompleted ? 'bg-green-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}
+                                  style={{ width: `${progressPercent}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between mt-1 text-[10px] text-[var(--color-text-variant)] font-mono">
+                                <span>{paidInstallments} ödendi</span>
+                                <span>{remainingInstallments > 0 ? `${remainingInstallments} kaldı` : 'Bitti'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-left md:text-right w-full md:w-auto">
+                          <p className="text-xl font-black font-mono text-white">
+                            {new Intl.NumberFormat('tr-TR').format(expense.amount)} <span className="text-[var(--color-brand-tertiary)] text-sm">₺</span>
+                          </p>
+                          <p className="text-xs text-pink-400 font-mono mt-0.5 flex items-center md:justify-end gap-1">
+                            <Clock size={10} />
+                            Aylık: {new Intl.NumberFormat('tr-TR').format(monthlyAmount)} ₺
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </>
         )}
+      </div>
+
+      {/* Page Footer Actions */}
+      <div className="flex justify-center mt-8 mb-12">
+        <button
+          onClick={() => setShowInstallmentsModal(true)}
+          className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 text-white font-bold hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(168,85,247,0.2)] transition-all group shadow-lg"
+        >
+          <div className="p-2 rounded-xl bg-purple-500/20 group-hover:bg-purple-500/30 transition-colors">
+            <Calendar size={20} className="text-purple-400" />
+          </div>
+          <span>Gelecek Taksitleri Ay Ay Gör</span>
+          <ArrowRight size={18} className="text-purple-400 group-hover:translate-x-1 transition-transform" />
+        </button>
       </div>
 
       {/* Receipt Preview Modal */}
@@ -1439,9 +1560,9 @@ export const TransactionsPage = () => {
                     <List size={22} className="text-purple-400" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-white text-lg">Tüm Taksitler</h3>
+                    <h3 className="font-bold text-white text-lg">Gelecek Taksitler</h3>
                     <p className="text-xs text-[var(--color-text-variant)] mt-0.5">
-                      {expenses.filter(e => e.installments > 1).length} taksitli işlem
+                      Ay bazlı ödeme planı
                     </p>
                   </div>
                 </div>
@@ -1453,34 +1574,9 @@ export const TransactionsPage = () => {
                 </button>
               </div>
 
-              {/* Summary */}
-              {(() => {
-                const installmentExpenses = expenses.filter(e => e.installments > 1);
-                const totalInstallmentAmount = installmentExpenses.reduce((sum, e) => sum + e.amount, 0);
-                const monthlyInstallmentAmount = installmentExpenses.reduce((sum, e) => sum + (e.amount / e.installments), 0);
-                return (
-                  <div className="px-6 py-4 border-b border-white/5 bg-[var(--color-surface-lowest)]/50 shrink-0">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/10">
-                        <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Toplam Taksitli Tutar</p>
-                        <p className="text-xl font-black text-white font-mono mt-1">
-                          {new Intl.NumberFormat('tr-TR').format(totalInstallmentAmount)} <span className="text-purple-400 text-sm">₺</span>
-                        </p>
-                      </div>
-                      <div className="p-3 rounded-xl bg-pink-500/10 border border-pink-500/10">
-                        <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Aylık Taksit Toplamı</p>
-                        <p className="text-xl font-black text-white font-mono mt-1">
-                          {new Intl.NumberFormat('tr-TR').format(monthlyInstallmentAmount)} <span className="text-pink-400 text-sm">₺</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
               {/* Installments List */}
-              <div className="overflow-y-auto flex-1">
-                {expenses.filter(e => e.installments > 1).length === 0 ? (
+              <div className="overflow-y-auto flex-1 p-6">
+                {futureMonthlyInstallments.length === 0 ? (
                   <div className="p-12 text-center flex flex-col items-center gap-4">
                     <div className="p-5 rounded-3xl bg-purple-500/5 border border-purple-500/10">
                       <List size={40} className="text-purple-400/40" />
@@ -1493,99 +1589,56 @@ export const TransactionsPage = () => {
                     </div>
                   </div>
                 ) : (
-                  <ul className="divide-y divide-white/5">
-                    {expenses.filter(e => e.installments > 1).map((expense, idx) => {
-                      const monthlyAmount = expense.amount / expense.installments;
-                      const expenseDate = new Date(expense.date);
-                      const now = new Date();
-                      // Calculate how many months have passed since the expense date
-                      const monthsPassed = Math.max(1, (now.getFullYear() - expenseDate.getFullYear()) * 12 + (now.getMonth() - expenseDate.getMonth()) + 1);
-                      const paidInstallments = Math.min(monthsPassed, expense.installments);
-                      const remainingInstallments = expense.installments - paidInstallments;
-                      const progressPercent = (paidInstallments / expense.installments) * 100;
-                      const isCompleted = remainingInstallments <= 0;
-
-                      return (
-                        <motion.li
-                          key={expense.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: idx * 0.05 }}
-                          className={`p-5 hover:bg-[var(--color-surface-container)] transition-colors ${isCompleted ? 'opacity-60' : ''}`}
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-4 min-w-0">
-                              {/* Category / Merchant Icon */}
-                              <div
-                                className="p-2.5 rounded-2xl shrink-0 text-lg"
-                                style={{
-                                  backgroundColor: `${CATEGORY_COLORS[expense.category] || '#94a3b8'}15`,
-                                }}
-                              >
-                                {CATEGORY_EMOJIS[expense.category] || '📦'}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="font-bold text-white text-base">{expense.merchant || expense.category}</p>
-                                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg ${isCompleted ? 'bg-green-500/15 text-green-400 border border-green-500/10' : 'bg-purple-500/15 text-purple-300 border border-purple-500/10'}`}>
-                                    {isCompleted ? '✓ Tamamlandı' : `${paidInstallments}/${expense.installments} Taksit`}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-[var(--color-text-variant)] mt-1 font-mono flex-wrap">
-                                  <span className="flex items-center gap-1">
-                                    <Calendar size={10} />
-                                    {expense.date}
-                                  </span>
-                                  {expense.card_name && (
-                                    <>
-                                      <span className="text-white/20">•</span>
-                                      <span className="flex items-center gap-1">
-                                        <CreditCard size={10} />
-                                        {expense.card_name}
+                  <div className="space-y-8">
+                    {futureMonthlyInstallments.map((month) => (
+                      <div key={month.key} className="space-y-4">
+                        <div className="flex items-center justify-between px-2">
+                          <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                            <Calendar size={18} className="text-purple-400" />
+                            {month.label}
+                          </h4>
+                          <span className="text-pink-400 font-mono font-bold text-lg">
+                            {new Intl.NumberFormat('tr-TR').format(month.total)} ₺
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 gap-3">
+                          {month.items.map((expense, idx) => (
+                            <div key={`${expense.id}-${month.key}`} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-all">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex items-start gap-3">
+                                  <div className="p-2 rounded-xl bg-white/5 text-lg">
+                                    {CATEGORY_EMOJIS[expense.category] || '📦'}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-white text-sm">{expense.merchant || expense.category}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/10">
+                                        {expense.currentInstallmentNumber}/{expense.installments} Taksit
                                       </span>
-                                    </>
-                                  )}
-                                  {expense.description && (
-                                    <>
-                                      <span className="text-white/20">•</span>
-                                      <span className="truncate max-w-[180px]">{expense.description}</span>
-                                    </>
-                                  )}
+                                      {expense.card_name && (
+                                        <span className="text-[10px] text-[var(--color-text-variant)] flex items-center gap-1 font-mono">
+                                          <CreditCard size={8} /> {expense.card_name}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-
-                                {/* Progress Bar */}
-                                <div className="mt-3 w-full max-w-xs">
-                                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                                    <motion.div
-                                      initial={{ width: 0 }}
-                                      animate={{ width: `${progressPercent}%` }}
-                                      transition={{ duration: 0.8, delay: idx * 0.05 }}
-                                      className={`h-full rounded-full ${isCompleted ? 'bg-green-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}
-                                    />
-                                  </div>
-                                  <div className="flex justify-between mt-1.5 text-[10px] text-[var(--color-text-variant)] font-mono">
-                                    <span>{paidInstallments} ödendi</span>
-                                    <span>{remainingInstallments > 0 ? `${remainingInstallments} kaldı` : 'Bitti'}</span>
-                                  </div>
+                                <div className="text-right">
+                                  <p className="font-mono font-black text-white">
+                                    {new Intl.NumberFormat('tr-TR').format(expense.monthlyAmount)} <span className="text-xs font-normal">₺</span>
+                                  </p>
+                                  <p className="text-[9px] text-[var(--color-text-variant)] mt-0.5">
+                                    Toplam: {new Intl.NumberFormat('tr-TR').format(expense.amount)} ₺
+                                  </p>
                                 </div>
                               </div>
                             </div>
-
-                            {/* Amount Info */}
-                            <div className="text-right shrink-0">
-                              <p className="text-lg font-black font-mono text-white">
-                                {new Intl.NumberFormat('tr-TR').format(expense.amount)} <span className="text-[var(--color-brand-tertiary)] text-sm">₺</span>
-                              </p>
-                              <p className="text-xs text-[var(--color-text-variant)] font-mono mt-0.5 flex items-center gap-1 justify-end">
-                                <Clock size={10} />
-                                Aylık: {new Intl.NumberFormat('tr-TR').format(monthlyAmount)} ₺
-                              </p>
-                            </div>
-                          </div>
-                        </motion.li>
-                      );
-                    })}
-                  </ul>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </motion.div>
