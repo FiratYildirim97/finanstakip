@@ -72,14 +72,14 @@ export const RecurringTransactionsPage = () => {
     }, {} as Record<string, any[]>);
   };
 
-  // All unique categories from both income and expense recurring transactions
+  // Unique categories filtered by current type (income or expense)
   const allCategories = useMemo(() => {
     const cats = new Set<string>();
     recurring.forEach(r => {
-      if (r.category) cats.add(r.category);
+      if (r.category && r.type === type) cats.add(r.category);
     });
     return Array.from(cats).sort((a, b) => a.localeCompare(b, 'tr'));
-  }, [recurring]);
+  }, [recurring, type]);
 
   const filteredCategories = useMemo(() => {
     if (!category) return allCategories;
@@ -446,7 +446,9 @@ const totalMonthlyExpense = recurring.filter(r => r.type === 'expense').reduce((
                 </div>
                 {showCategoryDropdown && filteredCategories.length > 0 && (
                   <div className="absolute z-20 w-full mt-1 bg-[var(--color-surface-container)] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-[200px] overflow-y-auto">
-                    {filteredCategories.map(cat => (
+                    {filteredCategories.map(cat => {
+                      const countInCat = recurring.filter(r => r.category === cat && r.type === type).length;
+                      return (
                       <button
                         key={cat}
                         type="button"
@@ -456,15 +458,10 @@ const totalMonthlyExpense = recurring.filter(r => r.type === 'expense').reduce((
                         }`}
                       >
                         <span>{cat}</span>
-                        {recurring.some(r => r.category === cat && r.type === 'income') && recurring.some(r => r.category === cat && r.type === 'expense') ? (
-                          <span className="text-[9px] font-mono text-[var(--color-text-variant)]">↑↓</span>
-                        ) : recurring.some(r => r.category === cat && r.type === 'income') ? (
-                          <span className="text-[9px] font-mono text-[#4edeb3]">gelir</span>
-                        ) : (
-                          <span className="text-[9px] font-mono text-[#ff7886]">gider</span>
-                        )}
+                        <span className="text-[9px] font-mono text-[var(--color-text-variant)]">{countInCat} kayıt</span>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
