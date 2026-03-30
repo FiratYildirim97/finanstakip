@@ -26,7 +26,9 @@ import {
   CreditCard as CardIcon,
   LayoutList,
   History,
-  Target
+  Target,
+  CheckSquare,
+  Check
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { toast } from 'sonner';
@@ -50,7 +52,8 @@ export const RecurringTransactionsPage = () => {
     updateRecurring,
     deleteTransaction,
     updateTransaction,
-    addTransaction
+    addTransaction,
+    updateAccount
   } = useData();
   
   // Tabs: 'plan' (Recurring management) or 'actuals' (Historical list)
@@ -86,6 +89,7 @@ export const RecurringTransactionsPage = () => {
   const [totalInstallments, setTotalInstallments] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [isExempt, setIsExempt] = useState(false);
+  const [isEstimated, setIsEstimated] = useState(false);
   const [rates, setRates] = useState<Record<string, number>>({ TRY: 1 });
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -103,6 +107,15 @@ export const RecurringTransactionsPage = () => {
   const [editActualAmount, setEditActualAmount] = useState('');
   const [editActualCategory, setEditActualCategory] = useState('');
   const [editActualDesc, setEditActualDesc] = useState('');
+
+  // Confirmation Modal state for projected items
+  const [confirmingRec, setConfirmingRec] = useState<any | null>(null);
+  const [confirmAmount, setConfirmAmount] = useState('');
+  const [confirmDate, setConfirmDate] = useState('');
+  const [confirmAccountId, setConfirmAccountId] = useState('');
+  const [confirmDesc, setConfirmDesc] = useState('');
+  const [confirmCategory, setConfirmCategory] = useState('');
+  const [isConfirmingLoading, setIsConfirmingLoading] = useState(false);
 
   // Stats Logic: Actuals
   const actuals = useMemo(() => {
@@ -296,8 +309,11 @@ export const RecurringTransactionsPage = () => {
       }
     } else {
       // FUTURE DATE: Business as usual (just add recurring plan)
+      const finalDescription = isEstimated ? `[TAHMİN] ${description}` : description;
+      
       const { error: recError } = await addRecurring({
-        type, category, amount: parsedAmount, currency, description,
+        type, category, amount: parsedAmount, currency, 
+        description: finalDescription,
         frequency, next_date: nextDate, is_investment: isInvestment,
         total_installments: totalInstallments ? parseInt(totalInstallments) : undefined,
         linked_account_id: selectedAccountId || null,
@@ -311,9 +327,65 @@ export const RecurringTransactionsPage = () => {
       setAmount(''); setCategory(''); setDescription('');
       setFrequency('monthly'); setCurrency('TRY'); setIsInvestment(false); 
       setTotalInstallments(''); setSelectedAccountId(''); setIsExempt(false);
+      setIsEstimated(false);
     } else {
       toast.error('Hata oluştu', { id: 'submit-rec' });
       console.error(error);
+    }
+  };
+
+  const handleConfirmSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!confirmingRec) return;
+    
+    setIsConfirmingLoading(true);
+    try {
+      const parsedAmount = parseFloat(confirmAmount);
+      
+      // 1. Update bank account if linked
+      if (confirmAccountId) {
+        const account = accounts.find(a => a.id === confirmAccountId);
+        if (account) {
+          const adjustment = confirmingRec.type === 'income' ? parsedAmount : -parsedAmount;
+          await updateAccount(account.id, { balance: Number(account.balance) + adjustment });
+        }
+      }
+
+      // 2. Add to actual transactions
+      await addTransaction({
+        type: confirmingRec.type,
+        category: confirmCategory,
+        amount: parsedAmount,
+        date: confirmDate,
+        description: confirmDesc || confirmingRec.description,
+        linked_account_id: confirmAccountId || null
+      });
+
+      // 3. Update or delete recurring source
+      let finished = false;
+      let nextOcc = new Date(confirmingRec.next_date);
+      
+      if (confirmingRec.frequency === 'monthly') nextOcc.setMonth(nextOcc.setMonth(nextOcc.getMonth() + 1));
+      else if (confirmingRec.frequency === 'weekly') nextOcc.setDate(nextOcc.getDate() + 7);
+      else if (confirmingRec.frequency === 'yearly') nextOcc.setFullYear(nextOcc.getFullYear() + 1);
+      else finished = true;
+
+      if (confirmingRec.total_installments && confirmingRec.total_installments > 0) {
+        const remaining = confirmingRec.total_installments - 1;
+        if (remaining === 0) finished = true;
+        else await updateRecurring(confirmingRec.id, { next_date: nextOcc.toISOString().split('T')[0], total_installments: remaining });
+      } else if (!finished) {
+        await updateRecurring(confirmingRec.id, { next_date: nextOcc.toISOString().split('T')[0] });
+      } else {
+        await deleteRecurring(confirmingRec.id);
+      }
+
+      toast.success('İşlem başarıyla gerçekleşti!');
+      setConfirmingRec(null);
+    } catch (err) {
+      toast.error('İşlem sırasında hata oluştu.');
+    } finally {
+      setIsConfirmingLoading(false);
     }
   };
 
@@ -536,6 +608,19 @@ export const RecurringTransactionsPage = () => {
                                  <div className={`w-3 h-3 bg-white rounded-full transition-all duration-300 transform ${isExempt ? 'translate-x-5' : 'translate-x-0'}`} />
                                </button>
                             </div>
+                            <div className="flex items-center justify-between p-3 bg-purple-500/5 border border-purple-500/10 rounded-2xl group transition-all mt-2">
+                                <div className="flex flex-col">
+                                   <label className="text-[10px] font-bold text-purple-200 uppercase tracking-widest leading-none">Tahmini Tutar/Tarih</label>
+                                   <span className="text-[8px] text-purple-400 font-medium mt-1">Kesin olmayan öngörü</span>
+                                </div>
+                                <button 
+                                  type="button"
+                                  onClick={() => setIsEstimated(!isEstimated)}
+                                  className={`relative w-10 h-5 rounded-full transition-all duration-300 flex items-center px-1 ${isEstimated ? 'bg-purple-500' : 'bg-white/10'}`}
+                                >
+                                  <div className={`w-3 h-3 bg-white rounded-full transition-all duration-300 transform ${isEstimated ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </button>
+                             </div>
                            </div>
 
                            <div>
@@ -580,8 +665,13 @@ export const RecurringTransactionsPage = () => {
                                        </button>
                                     </div>
                                  </div>
-                                 <h4 className="font-bold text-white text-sm">{rec.category}</h4>
-                                 <p className="text-[10px] text-[var(--color-text-variant)] font-mono">{rec.description || 'Açıklama yok'}</p>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="font-bold text-white text-sm">{rec.category}</h4>
+                                    {rec.description?.includes('[TAHMİN]') && (
+                                       <span className="px-1.5 py-0.5 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[7px] font-black uppercase tracking-tighter rounded-md">TAHMİN</span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-[var(--color-text-variant)] font-mono">{(rec.description || '').replace('[TAHMİN]', '').trim() || 'Açıklama yok'}</p>
                                  <div className="mt-4 flex items-end justify-between">
                                     <div>
                                        <p className="text-[9px] text-white/30 uppercase font-bold font-mono">Tutar</p>
@@ -602,6 +692,21 @@ export const RecurringTransactionsPage = () => {
                                           </div>
                                           {isFutureProjection && <span className="text-[var(--color-brand-primary)] text-sm font-black">*</span>}
                                        </div>
+                                    </div>
+                                    <div className="flex justify-end pt-3">
+                                      <button 
+                                        onClick={() => {
+                                          setConfirmingRec(rec);
+                                          setConfirmAmount(String(rec.amount));
+                                          setConfirmDate(rec.occurrenceDate.toISOString().split('T')[0]);
+                                          setConfirmAccountId(rec.linked_account_id || '');
+                                          setConfirmDesc(rec.description || '');
+                                          setConfirmCategory(rec.category);
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 border border-white/5 rounded-full text-white/40 hover:text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/10 hover:border-[var(--color-brand-primary)]/20 transition-all font-black uppercase text-[8px] tracking-wider"
+                                      >
+                                        <Check size={12} /> Gerçekleştir
+                                      </button>
                                     </div>
                                  </div>
                               </div>
@@ -913,6 +1018,96 @@ export const RecurringTransactionsPage = () => {
            </div>
          )}
       </div>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {confirmingRec && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setConfirmingRec(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-[#1a1c1e] border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden"
+            >
+              <div className={`p-6 border-b border-white/5 flex items-center justify-between ${confirmingRec.type === 'income' ? 'bg-[#4edeb3]/10' : 'bg-[#ffb4ab]/10'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${confirmingRec.type === 'income' ? 'bg-[#4edeb3]/20 text-[#4edeb3]' : 'bg-[#ffb4ab]/20 text-[#ffb4ab]'}`}>
+                    <ArrowRight size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white font-display">İşlemi Gerçekleştir</h3>
+                    <p className={`text-[9px] font-bold uppercase tracking-widest ${confirmingRec.type === 'income' ? 'text-[#4edeb3]' : 'text-[#ffb4ab]'}`}>
+                      {confirmingRec.type === 'income' ? 'GELİR' : 'GİDER'} • {confirmingRec.category}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setConfirmingRec(null)} className="w-10 h-10 rounded-2xl bg-white/5 text-white/20 hover:text-white flex items-center justify-center">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleConfirmSubmit} className="p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-1.5 font-mono">Tutar</label>
+                    <input 
+                      type="number" step="0.01" required 
+                      value={confirmAmount} onChange={e => setConfirmAmount(e.target.value)}
+                      className="w-full px-4 py-3 bg-black/40 text-white border border-white/10 rounded-2xl text-base outline-none focus:border-[var(--color-brand-primary)] transition-all font-mono" 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-1.5 font-mono">Tarih</label>
+                    <input 
+                      type="date" required 
+                      value={confirmDate} onChange={e => setConfirmDate(e.target.value)}
+                      className="w-full px-4 py-3 bg-black/40 text-white border border-white/10 rounded-2xl text-base outline-none focus:border-[var(--color-brand-primary)] transition-all font-mono [color-scheme:dark]" 
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-1.5 font-mono">Banka Hesabı</label>
+                  <select 
+                    value={confirmAccountId} onChange={e => setConfirmAccountId(e.target.value)}
+                    className="w-full px-4 py-3 bg-black/40 text-white border border-white/10 rounded-2xl text-sm outline-none focus:border-[var(--color-brand-primary)] transition-all"
+                  >
+                    <option value="">Hesap Seçilmedi</option>
+                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(acc.balance)})</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block mb-1.5 font-mono">Açıklama</label>
+                  <input 
+                    type="text" 
+                    value={confirmDesc} onChange={e => setConfirmDesc(e.target.value)}
+                    placeholder="Örn: Maaş yattı, Fatura ödendi..."
+                    className="w-full px-4 py-3 bg-black/40 text-white border border-white/10 rounded-2xl text-sm outline-none focus:border-[var(--color-brand-primary)] transition-all" 
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button 
+                    type="submit" 
+                    disabled={isConfirmingLoading}
+                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 ${confirmingRec.type === 'income' ? 'bg-[#4edeb3] text-black hover:shadow-[0_0_20px_rgba(78,222,179,0.4)]' : 'bg-[#ffb4ab] text-black hover:shadow-[0_0_20px_rgba(255,180,171,0.4)]'}`}
+                  >
+                    {isConfirmingLoading ? <RefreshCcw size={18} className="animate-spin" /> : <><CheckSquare size={18} /> Onayla ve Kaydet</>}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
