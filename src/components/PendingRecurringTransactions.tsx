@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
-import { useTransactions } from '../hooks/useTransactions';
+import { useData } from '../context/DataContext';
 import { Bell, CheckSquare, XSquare, Play, CalendarClock, FastForward, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -9,8 +8,7 @@ import { toast } from 'sonner';
  * işlemleri "Ekle" olarak gösterir. Çok eski olanlar sessizce next_date güncellenir.
  */
 export const PendingRecurringTransactions = () => {
-  const { recurring, updateRecurring, deleteRecurring } = useRecurringTransactions();
-  const { addTransaction } = useTransactions();
+  const { recurring, accounts, updateAccount, updateRecurring, deleteRecurring, addTransaction } = useData();
   const [pending, setPending] = useState<any[]>([]);
   const [processing, setProcessing] = useState<string | null>(null);
   const [autoAdvancing, setAutoAdvancing] = useState(false);
@@ -62,8 +60,20 @@ export const PendingRecurringTransactions = () => {
       let finished = false;
 
       if (rec.type === 'income') {
-        // GELİR: Sadece tarihini ileri al (addTransaction yapılmayacak, çünkü "Aylık" sekmesi sadece görünüm için)
+        // GELİR: Tarihi ileri al ve İŞLEM OLARAK EKLE (grafikte görünmesi için)
+        // Sadece bir banka hesabına bağlı DEĞİLSE sessizce ekler. Bağlıysa ana ekranda kullanıcıdan onay bekler.
+        if (rec.linked_account_id) continue; 
+
         while (nextDate <= today && !finished) {
+          // Grafik ve geçmiş için işlemi ekle
+          await addTransaction({
+            amount: rec.amount,
+            category: rec.category,
+            type: 'income',
+            date: nextDate.toISOString().split('T')[0],
+            description: `Düzenli Gelir: ${rec.description || rec.category}`
+          });
+
           if (rec.frequency === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
           else if (rec.frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
           else if (rec.frequency === 'yearly') nextDate.setFullYear(nextDate.getFullYear() + 1);
@@ -120,29 +130,52 @@ export const PendingRecurringTransactions = () => {
 
     const due = recurring.filter(r => {
       if (!r.next_date) return false;
-      // Sadece GİDERLERİ hatırlat, gelirler pasif takip içindir
-      if (r.type !== 'expense') return false;
-      const nextD = new Date(r.next_date);
-      nextD.setHours(0, 0, 0, 0);
-      // Sadece grace period ile bugün arası (dahil)
-      return nextD >= gracePeriod && nextD <= today;
+      // Sadece GİDERLERİ veya bir hesaba bağlı olan GELİRLERİ hatırlat
+      // (Hesaba bağlı olmayan gelirler sadece bütçede görünüyor)
+      const isDue = new Date(r.next_date).setHours(0,0,0,0) <= today.getTime();
+      const isRecent = new Date(r.next_date) >= gracePeriod;
+      
+      if (r.type === 'expense') return isRecent && isDue;
+      // Gelirleri sadece bir banka hesabına bağlıysa ve günüyse göster (onaylansın ki bakiye artsın)
+      if (r.type === 'income') return r.linked_account_id && isDue && isRecent;
+      
+      return false;
     });
 
     setPending(due);
-  }, [recurring]);
+  }, [recurring, accounts]);
 
   if (pending.length === 0 && !autoAdvancing) return null;
 
   const handleProcess = async (rec: any) => {
     setProcessing(rec.id);
     
-    // 1. Add to transactions
+    // 1. If there's a linked account, update its balance
+    if (rec.linked_account_id) {
+      const account = accounts.find(a => a.id === rec.linked_account_id);
+      if (account) {
+        const adjustment = rec.type === 'income' ? rec.amount : -rec.amount;
+        // Ensure balance is numeric
+        const currentBalance = typeof account.balance === 'string' ? parseFloat(account.balance) : account.balance;
+        const newBalance = currentBalance + adjustment;
+        
+        const { error: accError } = await updateAccount(account.id, { balance: newBalance });
+        if (accError) {
+          toast.error(`Hesap bakiyesi güncellenirken hata: ${account.name}`);
+        } else {
+          toast.info(`${account.name} bakiyesi güncellendi.`);
+        }
+      }
+    }
+
+    // 2. Add to transactions
     const { error: txError } = await addTransaction({
       amount: rec.amount,
       category: rec.category,
       type: rec.type,
       date: new Date().toISOString(),
-      description: `Düzenli ${rec.type === 'income' ? 'Gelir' : 'Gider'}: ${rec.description || rec.category}`
+      description: `Düzenli ${rec.type === 'income' ? 'Gelir' : 'Gider'}: ${rec.description || rec.category}`,
+      linked_account_id: rec.linked_account_id
     });
 
     if (txError) {
@@ -244,9 +277,9 @@ export const PendingRecurringTransactions = () => {
           <Bell size={24} />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-white font-display">Günü Gelen Düzenli Giderler</h2>
+          <h2 className="text-lg font-bold text-white font-display">Onay Bekleyen İşlemler</h2>
           <p className="text-xs md:text-sm text-[var(--color-text-variant)] mt-0.5">
-            Aşağıdaki düzenli giderlerin vadesi geldi. Onaylayarak aylık harcamalarınıza ekleyin.
+            Vadesi gelen düzenli gelir ve giderlerinizi onaylayarak işleme alın.
           </p>
         </div>
       </div>

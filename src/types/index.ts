@@ -16,6 +16,8 @@ export interface Transaction {
   type: TransactionType;
   date: string;
   description: string | null;
+  linked_account_id?: string | null;
+  is_exempt: boolean;
   created_at: string;
 }
 
@@ -81,9 +83,11 @@ export interface RecurringTransaction {
   is_investment: boolean;
   linked_bes_id?: string;
   linked_gold_day_id?: string;
+  linked_account_id?: string | null;
   initial_amount?: number;
   start_date?: string;
   total_installments?: number;
+  is_exempt: boolean;
   created_at: string;
 }
 
@@ -139,6 +143,7 @@ export interface CreditCardExpense {
   card_id: string | null;
   installments: number;
   receipt_url: string | null;
+  is_exempt: boolean;
   date: string;
   created_at: string;
 }
@@ -152,6 +157,8 @@ export interface CreditCard {
   payment_day: number;
   cut_off_day: number | null;
   card_limit: number | null;
+  limit_amount?: number; // Alias used in some components
+  current_debt?: number;  // Computed field for UI
   color: string;
   created_at: string;
 }

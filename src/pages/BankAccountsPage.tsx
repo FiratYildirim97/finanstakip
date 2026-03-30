@@ -1,8 +1,9 @@
 import React, { useState, FormEvent, useMemo } from 'react';
 import { useBankAccounts } from '../hooks/useBankAccounts';
 import { BankAccountType, BankAccount } from '../types';
-import { Landmark, Plus, Trash2, CalendarClock, TrendingUp, Wallet, Pencil, CheckCircle2, AlertCircle, Clock, ArrowRight } from 'lucide-react';
+import { Landmark, Plus, Trash2, CalendarClock, TrendingUp, Wallet, Pencil, CheckCircle2, AlertCircle, Clock, ArrowRight, Calculator, ArrowRightLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { SavingsCalculator } from '../components/SavingsCalculator';
 
 /**
  * Günlük vadeli hesap: Her gün faiz birikir → Toplam bakiye = ana para + birikmiş net faiz
@@ -23,8 +24,8 @@ function daysUntil(dateStr: string, now: Date): number {
   return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
 
-// Hesap için birikmiş faizi hesapla
-function calculateAccruedInterest(acc: BankAccount, now: Date): { grossInterest: number; netInterest: number; daysAccrued: number; currentValue: number } {
+// Hesap için faiz bilgilerini hesapla
+function calculateAccruedInterest(acc: BankAccount, now: Date): { grossInterest: number; netInterest: number; daysAccrued: number; currentValue: number; projectedNetInterest?: number; projectedTotal?: number; totalDays?: number; remainingDays?: number } {
   const taxMultiplier = 1 - (acc.tax_rate || 0) / 100;
 
   if (acc.account_type === 'daily_deposit') {
@@ -44,14 +45,39 @@ function calculateAccruedInterest(acc: BankAccount, now: Date): { grossInterest:
     if (!maturityDate) return { grossInterest: 0, netInterest: 0, daysAccrued: 0, currentValue: acc.balance };
     
     const totalDays = daysBetween(depositDate, new Date(maturityDate));
-    const elapsedDays = daysBetween(depositDate, now);
-    const actualDays = Math.min(elapsedDays, totalDays); // Vade dolmuşsa max gün sayısı
+    const remainingDays = daysUntil(maturityDate, now);
+    const isMatured = remainingDays <= 0;
     
     const dailyRate = acc.interest_rate ? (acc.interest_rate / 100) / 365 : 0;
-    const grossInterest = acc.balance * dailyRate * actualDays;
-    const netInterest = grossInterest * taxMultiplier;
     
-    return { grossInterest, netInterest, daysAccrued: actualDays, currentValue: acc.balance + netInterest };
+    // Vade sonunda kazanılacak toplam net faiz
+    const projectedGross = acc.balance * dailyRate * totalDays;
+    const projectedNet = projectedGross * taxMultiplier;
+    
+    if (isMatured) {
+      return { 
+        grossInterest: projectedGross, 
+        netInterest: projectedNet, 
+        daysAccrued: totalDays, 
+        currentValue: acc.balance + projectedNet,
+        projectedNetInterest: projectedNet,
+        projectedTotal: acc.balance + projectedNet,
+        totalDays,
+        remainingDays: 0
+      };
+    } else {
+      // Henüz vade dolmadı: Anapara değişmez, faiz sadece "beklenen" olarak gösterilir
+      return { 
+        grossInterest: 0, 
+        netInterest: 0, 
+        daysAccrued: 0, 
+        currentValue: acc.balance,
+        projectedNetInterest: projectedNet,
+        projectedTotal: acc.balance + projectedNet,
+        totalDays,
+        remainingDays
+      };
+    }
   }
 
   return { grossInterest: 0, netInterest: 0, daysAccrued: 0, currentValue: acc.balance };
@@ -74,6 +100,13 @@ export const BankAccountsPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+
+  // Transfer State
+  const [fromAccountId, setFromAccountId] = useState('');
+  const [toAccountId, setToAccountId] = useState('');
+  const [transferAmount, setTransferAmount] = useState('');
+
   const isSubmittingRef = React.useRef(false); // To handle quick double clicks
 
   const now = useMemo(() => new Date(), []);
@@ -154,6 +187,52 @@ export const BankAccountsPage = () => {
     isSubmittingRef.current = false;
   };
 
+  const handleTransfer = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!fromAccountId || !toAccountId || !transferAmount || isSubmittingRef.current) return;
+    if (fromAccountId === toAccountId) {
+      toast.error('Aynı hesaplar arasında transfer yapılamaz.');
+      return;
+    }
+
+    const amount = parseFloat(transferAmount);
+    const fromAcc = accounts.find(a => a.id === fromAccountId);
+    const toAcc = accounts.find(a => a.id === toAccountId);
+
+    if (!fromAcc || !toAcc) return;
+
+    setIsSubmitting(true);
+    isSubmittingRef.current = true;
+
+    try {
+      // 1. Gönderen hesaptan düş
+      const { error: error1 } = await updateAccount(fromAccountId, {
+        balance: fromAcc.balance - amount
+      });
+
+      if (error1) throw error1;
+
+      // 2. Alıcı hesaba ekle
+      const { error: error2 } = await updateAccount(toAccountId, {
+        balance: toAcc.balance + amount
+      });
+
+      if (error2) throw error2;
+
+      toast.success('Transfer başarıyla gerçekleştirildi!');
+      setIsTransferModalOpen(false);
+      setTransferAmount('');
+      setFromAccountId('');
+      setToAccountId('');
+    } catch (err) {
+      toast.error('Transfer sırasında hata oluştu.');
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+    }
+  };
+
   const resetForm = () => {
     setName('');
     setBalance('');
@@ -199,6 +278,16 @@ export const BankAccountsPage = () => {
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[#cda4ff] font-display flex items-center gap-3">
           <Landmark size={36} /> Banka Hesaplarım
         </h1>
+        <div className="flex gap-2">
+            <button
+                onClick={() => setIsTransferModalOpen(true)}
+                className="px-5 py-2.5 bg-white/5 border border-white/10 text-white rounded-2xl font-bold flex items-center gap-2 hover:bg-white/10 transition-all"
+            >
+                <ArrowRightLeft size={18} className="text-[#cda4ff]" />
+                <span className="hidden sm:inline">Para Transferi</span>
+                <span className="sm:hidden">Transfer</span>
+            </button>
+        </div>
       </div>
 
       <div className="flex flex-col xl:flex-row gap-4 sm:gap-6">
@@ -242,6 +331,8 @@ export const BankAccountsPage = () => {
             </button>
         </div>
       </div>
+
+      <SavingsCalculator />
 
       <div className="space-y-6">
         
@@ -332,6 +423,91 @@ export const BankAccountsPage = () => {
             </form>
             </div>
           </div>
+          </div>
+        )}
+
+        {/* TRANSFER MODAL */}
+        {isTransferModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" onClick={() => setIsTransferModalOpen(false)}>
+            <div 
+              className="bg-[var(--color-surface-container)] rounded-3xl w-full max-w-md border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-white/5 bg-gradient-to-r from-[#cda4ff]/10 to-transparent flex justify-between items-center">
+                <h3 className="font-bold text-white flex items-center gap-2 text-lg">
+                  <ArrowRightLeft size={20} className="text-[#cda4ff]" /> Hesaptan Hesaba Transfer
+                </h3>
+              </div>
+              <div className="p-6">
+                <form onSubmit={handleTransfer} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Gönderen Hesap</label>
+                    <select 
+                      required
+                      value={fromAccountId} 
+                      onChange={e => setFromAccountId(e.target.value)} 
+                      className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#cda4ff] transition-colors appearance-none"
+                    >
+                      <option value="">Hesap Seçin...</option>
+                      {accounts.filter(a => a.account_type === 'checking' || a.account_type === 'daily_deposit').map(acc => (
+                        <option key={acc.id} value={acc.id}>{acc.name} ({fmt(acc.balance)})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex justify-center -my-2 relative z-10">
+                      <div className="bg-[var(--color-surface-lowest)] p-1.5 rounded-full border border-white/10">
+                          <ArrowRight className="rotate-90 text-[#cda4ff]" size={16} />
+                      </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Alıcı Hesap</label>
+                    <select 
+                      required
+                      value={toAccountId} 
+                      onChange={e => setToAccountId(e.target.value)} 
+                      className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#cda4ff] transition-colors appearance-none"
+                    >
+                      <option value="">Hesap Seçin...</option>
+                      {accounts.map(acc => (
+                        <option key={acc.id} value={acc.id}>{acc.name} ({fmt(acc.balance)})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Transfer Tutarı (₺)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      required 
+                      value={transferAmount} 
+                      onChange={e => setTransferAmount(e.target.value)} 
+                      placeholder="0.00" 
+                      className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#cda4ff] transition-colors" 
+                    />
+                  </div>
+
+                  <div className="pt-2 flex gap-2">
+                    <button 
+                      type="submit" 
+                      disabled={isSubmitting}
+                      className="w-full bg-gradient-to-r from-[#cda4ff] to-[#ae70fe] text-black rounded-xl py-3 font-bold hover:brightness-110 transition disabled:opacity-50"
+                    >
+                      Transferi Onayla
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsTransferModalOpen(false)}
+                      className="w-full bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl py-3 font-bold hover:bg-white/5 transition"
+                    >
+                      İptal
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
           </div>
         )}
 
@@ -508,7 +684,7 @@ function AccountGroup({ title, subtitle, icon, accounts, onEdit, onDelete, fmt, 
                      )}
                   </div>
                   
-                  {showInterestDetails && acc.daysAccrued > 0 && (
+                  {showInterestDetails && acc.account_type === 'daily_deposit' && acc.daysAccrued > 0 && (
                     <div className="mt-2 text-[11px] font-mono space-y-0.5">
                       <p className="text-[var(--color-text-variant)]">
                         <Clock size={10} className="inline mr-1" />
@@ -521,14 +697,25 @@ function AccountGroup({ title, subtitle, icon, accounts, onEdit, onDelete, fmt, 
                       </p>
                     </div>
                   )}
-                  
-                  {showMaturity && acc.maturity_date && (
-                    <div className="mt-2 text-[11px] font-mono flex items-center gap-2">
-                      <CalendarClock size={11} className="text-[var(--color-text-variant)]" />
-                      <span className="text-[var(--color-text-variant)]">
-                        Kalan: <span className="text-white font-bold">{remaining} gün</span>
-                        <span className="opacity-50 ml-1">(Bitiş: {acc.maturity_date})</span>
-                      </span>
+
+                  {acc.account_type === 'term_deposit' && !acc.isMatured && (
+                    <div className="mt-2 text-[11px] font-mono space-y-1 bg-white/5 p-3 rounded-xl border border-white/5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[var(--color-text-variant)]">Anapara:</span>
+                        <span className="text-white font-bold">{fmt(acc.balance)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[#4edeb3]">
+                        <span className="opacity-80">Vade Sonu Getiri:</span>
+                        <span className="font-bold">+{fmt(acc.projectedNetInterest || 0)}</span>
+                      </div>
+                      <div className="pt-1 mt-1 border-t border-white/5 flex justify-between items-center">
+                        <span className="text-[var(--color-text-variant)] text-[10px]">Vade Sonu Toplam:</span>
+                        <span className="text-white text-xs font-black">{fmt(acc.projectedTotal || 0)}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 pt-1 text-[10px] text-white/40">
+                         <CalendarClock size={10} />
+                         <span>{acc.remainingDays} gün kaldı (Vade: {acc.maturity_date})</span>
+                      </div>
                     </div>
                   )}
                   
@@ -543,22 +730,24 @@ function AccountGroup({ title, subtitle, icon, accounts, onEdit, onDelete, fmt, 
               </div>
               <div className="text-left sm:text-right flex items-center justify-between sm:justify-end gap-5 w-full sm:w-auto mt-2 sm:mt-0">
                 <div>
-                  {showInterestDetails ? (
-                    <>
-                      <p className="text-[10px] text-[var(--color-text-variant)] font-mono mb-0.5">Bugünkü Değer</p>
-                      <p className="font-black font-mono text-lg text-white">
-                        {fmt(acc.currentValue)}
-                      </p>
-                      <p className="text-[10px] text-[var(--color-text-variant)] font-mono mt-0.5 flex gap-1 justify-end items-center">
-                        <span className="opacity-60">Ana:</span> {fmt(acc.balance)}
-                        <ArrowRight size={9} className="opacity-40" />
-                        <span className="text-[#4edeb3]">+{fmt(acc.netInterest)}</span>
-                      </p>
-                    </>
-                  ) : (
+                  {acc.account_type === 'checking' ? (
                     <p className="font-black font-mono text-lg text-white">
                       {fmt(acc.balance)}
                     </p>
+                  ) : acc.account_type === 'daily_deposit' ? (
+                    <>
+                      <p className="text-[10px] text-[var(--color-text-variant)] font-mono mb-0.5 text-right">Bugünkü Değer</p>
+                      <p className="font-black font-mono text-lg text-white text-right">
+                        {fmt(acc.currentValue)}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[10px] text-[var(--color-text-variant)] font-mono mb-0.5 text-right">Anapara</p>
+                      <p className="font-black font-mono text-lg text-white text-right">
+                        {fmt(acc.balance)}
+                      </p>
+                    </>
                   )}
                 </div>
                 <div className="flex">

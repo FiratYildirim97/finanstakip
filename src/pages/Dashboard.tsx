@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNetWorth } from '../hooks/useNetWorth';
 import { useTransactions } from '../hooks/useTransactions';
@@ -20,8 +20,9 @@ import {
   Clock, Landmark, Activity, CreditCard, PiggyBank, Target, CalendarDays,
   TrendingDown, BarChart3, Banknote, Shield, ChevronRight, DollarSign,
   ArrowRight, Zap, AlertTriangle, CheckCircle2, Percent, Eye, Pencil,
-  ChevronDown, X
+  ChevronDown, X, LayoutList, MessageSquare, Bot, Loader2
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -77,18 +78,57 @@ export const Dashboard = () => {
   const { accounts } = useBankAccounts();
   const { recurring } = useRecurringTransactions();
   const { goals, budgets } = useGoalsAndBudgets();
+  const now = useMemo(() => new Date(), []);
   const { cards } = useCreditCards();
-  const { expenses: ccExpenses, totalExpenses: totalCCExpenses } = useCreditCardExpenses();
+  const { expenses: ccExpenses } = useCreditCardExpenses();
   
+  // ─── Period Logic (15th-14th cycle) ───────────────────
+  const activePeriod = useMemo(() => {
+    let start: Date;
+    if (now.getDate() >= 15) {
+      start = new Date(now.getFullYear(), now.getMonth(), 15);
+    } else {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+    }
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 14, 23, 59, 59);
+    return { start, end };
+  }, [now]);
+
+  // Asset Visibility State
+  const [assetVisibility, setAssetVisibility] = useState({
+    banks: true,
+    investments: true,
+    savings: true,
+    cards: true
+  });
+
+  const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
+  
+  // Initialize selectedBankIds when accounts are loaded
+  useEffect(() => {
+    if (accounts.length > 0 && selectedBankIds.length === 0) {
+      setSelectedBankIds(accounts.map(a => a.id));
+    }
+  }, [accounts]);
+
+  const toggleBankSelection = (id: string) => {
+    setSelectedBankIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [advice, setAdvice] = useState<string | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
-  const [expandedBreakdown, setExpandedBreakdown] = useState<'banks' | 'investments' | 'savings' | 'interest' | null>(null);
+  const [chatQuestion, setChatQuestion] = useState('');
+  const [chatResponse, setChatResponse] = useState<string | null>(null);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [expandedBreakdown, setExpandedBreakdown] = useState<'interest' | null>(null);
 
   const toggleBreakdown = (section: 'banks' | 'investments' | 'savings' | 'interest') => {
     setExpandedBreakdown(prev => prev === section ? null : section);
   };
 
-  const now = useMemo(() => new Date(), []);
   const formatMoney = (val: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
   const formatCompact = (val: number) => {
     if (Math.abs(val) >= 1000000) return `₺${(val / 1000000).toFixed(1)}M`;
@@ -96,141 +136,187 @@ export const Dashboard = () => {
     return formatMoney(val);
   };
 
-  // ─── Net Worth Breakdown ─────────────────────────────────
   const bankProcessed = useMemo(() => accounts.map(acc => ({
     ...acc,
     ...calculateAccruedInterest(acc, now)
   })), [accounts, now]);
 
-  const totalBankValue = bankProcessed.reduce((a, b) => a + b.currentValue, 0);
+  const totalBankValue = useMemo(() => {
+    return bankProcessed
+      .filter(acc => selectedBankIds.includes(acc.id))
+      .reduce((a, b) => a + b.currentValue, 0);
+  }, [bankProcessed, selectedBankIds]);
+
   const totalBankInterest = bankProcessed.reduce((a, b) => a + b.netInterest, 0);
 
-  let totalDailyInterest = 0;
+  // Profit calculation for Dashboard KPI
+  let dailyDepositProfit = 0;
   bankProcessed.forEach(acc => {
     const taxMulti = 1 - (acc.tax_rate || 0) / 100;
-    if (acc.account_type === 'term_deposit' && acc.interest_rate && !(acc.maturity_date && daysUntil(acc.maturity_date, now) <= 0)) {
-      totalDailyInterest += (acc.balance * (acc.interest_rate / 100)) / 365 * taxMulti;
-    } else if (acc.account_type === 'daily_deposit' && acc.interest_rate) {
+    if (acc.account_type === 'daily_deposit' && acc.interest_rate) {
       const workingBalance = Math.max(0, acc.balance - acc.exempt_amount);
-      totalDailyInterest += (workingBalance * (acc.interest_rate / 100)) / 365 * taxMulti;
+      dailyDepositProfit += (workingBalance * (acc.interest_rate / 100)) / 365 * taxMulti;
     }
   });
-  
+
   const portfolioValue = investments.reduce((acc, curr) => acc + (curr.quantity * curr.current_price), 0);
 
-  // ─── Cash Flow Analysis ──────────────────────────────────
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  
-  const currentMonthTransactions = transactions.filter(t => {
+  const cardDebt = cards.reduce((acc, c) => acc + (Number(c.current_debt) || 0), 0);
+
+
+  const visibleNetWorth = useMemo(() => {
+    let total = 0;
+    if (assetVisibility.banks) total += totalBankValue;
+    if (assetVisibility.investments) total += portfolioValue;
+    if (assetVisibility.savings) total += totalVirtualValue;
+    if (assetVisibility.cards) total -= cardDebt;
+    return total;
+  }, [assetVisibility, totalBankValue, portfolioValue, totalVirtualValue, cardDebt]);
+
+
+  // Period-based Analytics
+  const currentPeriodTransactions = transactions.filter(t => {
     const d = new Date(t.date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    return d >= activePeriod.start && d <= activePeriod.end && !t.is_exempt;
   });
 
-  const currentMonthIncome = currentMonthTransactions.filter(t => t.type === 'income').reduce((a, b) => a + b.amount, 0);
-  const currentMonthExpense = currentMonthTransactions.filter(t => t.type === 'expense').reduce((a, b) => a + b.amount, 0);
+  const currentMonthIncome = currentPeriodTransactions.filter(t => t.type === 'income').reduce((a, b) => a + Number(b.amount), 0);
+  const currentMonthExpense = currentPeriodTransactions.filter(t => t.type === 'expense').reduce((a, b) => a + Number(b.amount), 0);
   const currentMonthNet = currentMonthIncome - currentMonthExpense;
+
 
   // Last 6 months bar chart data
   const monthlyBarData = useMemo(() => {
-    const months: { month: string; income: number; expense: number }[] = [];
+    const data: { month: string; income: number; expense: number }[] = [];
+    const currentMonth_Calendar = now.getMonth();
+    const currentYear_Calendar = now.getFullYear();
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(currentYear, currentMonth - i, 1);
+      const d = new Date(currentYear_Calendar, currentMonth_Calendar - i, 1);
       const label = d.toLocaleDateString('tr-TR', { month: 'short' });
       const m = d.getMonth();
       const y = d.getFullYear();
       const mTransactions = transactions.filter(t => {
         const td = new Date(t.date);
-        return td.getMonth() === m && td.getFullYear() === y;
+        return td.getMonth() === m && td.getFullYear() === y && !t.is_exempt;
       });
-      months.push({
+      data.push({
         month: label,
-        income: mTransactions.filter(t => t.type === 'income').reduce((a, b) => a + b.amount, 0),
-        expense: mTransactions.filter(t => t.type === 'expense').reduce((a, b) => a + b.amount, 0),
+        income: mTransactions.filter(t => t.type === 'income').reduce((a, b) => a + Number(b.amount), 0),
+        expense: mTransactions.filter(t => t.type === 'expense').reduce((a, b) => a + Number(b.amount), 0),
       });
     }
-    return months;
-  }, [transactions, currentMonth, currentYear]);
+    return data;
+  }, [transactions, now]);
 
-  // Expense Categories (Current Month)
-  const expenseData = currentMonthTransactions
+  const expenseData = currentPeriodTransactions
     .filter(t => t.type === 'expense')
     .reduce((acc, curr) => {
       const existing = acc.find(item => item.name === curr.category);
-      if (existing) existing.value += curr.amount;
-      else acc.push({ name: curr.category, value: curr.amount });
+      if (existing) existing.value += Number(curr.amount);
+      else acc.push({ name: curr.category, value: Number(curr.amount) });
       return acc;
     }, [] as { name: string; value: number }[])
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
-  // Recent Transactions
   const recentTransactions = [...transactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 6);
 
-  // ─── Recurring Summary (all upcoming payments count) ─────
   const recurringIncomeItems = recurring.filter(r => r.type === 'income');
   const recurringExpenseItems = recurring.filter(r => r.type === 'expense');
 
-  // Helper: normalize to monthly equivalent
-  const toMonthly = (r: { amount: number; frequency: string }) => {
-    if (r.frequency === 'monthly') return r.amount;
-    if (r.frequency === 'weekly') return r.amount * 4;
-    if (r.frequency === 'yearly') return r.amount / 12;
-    if (r.frequency === 'once') return r.amount; // tek seferlik = bu ay gelecek/gidecek
-    return r.amount;
-  };
+  const budgetAlerts = useMemo(() => {
+    return budgets.filter(b => {
+      const spent = currentPeriodTransactions
+        .filter(t => t.category === b.category && t.type === 'expense')
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      return b.limit_amount > 0 && (spent / b.limit_amount) > 0.8;
+    }).length;
+  }, [budgets, currentPeriodTransactions]);
 
-  const recurringIncome = recurringIncomeItems.reduce((acc, r) => acc + toMonthly(r), 0);
-  const recurringExpense = recurringExpenseItems.reduce((acc, r) => acc + toMonthly(r), 0);
-  const recurringNet = recurringIncome - recurringExpense;
+  const creditCardSummary = useMemo(() => {
+    const totalLimit = cards.reduce((sum, c) => sum + (c.limit_amount || 0), 0);
+    const totalDebt = cards.reduce((sum, c) => sum + (c.current_debt || 0), 0);
+    const usagePct = totalLimit > 0 ? (totalDebt / totalLimit) * 100 : 0;
+    return {
+      totalDebt,
+      usagePct,
+      cardsList: [...cards].sort((a,b) => (b.current_debt || 0) - (a.current_debt || 0))
+    };
+  }, [cards]);
 
-  // Categorized grouping for display
-  const groupByCategory = (items: typeof recurring) => {
-    const map = new Map<string, { total: number; count: number; items: typeof recurring }>();
-    items.forEach(item => {
-      const key = item.category;
-      const existing = map.get(key) || { total: 0, count: 0, items: [] };
-      existing.total += toMonthly(item);
-      existing.count += 1;
-      existing.items.push(item);
-      map.set(key, existing);
+  const pendingTransactionsData = useMemo(() => {
+    let expenseSum = 0;
+    let incomeSum = 0;
+    const expenseList: { category: string; amount: number; type: 'expense' }[] = [];
+    const incomeList: { category: string; amount: number; type: 'income' }[] = [];
+
+    recurring.filter(r => !r.is_exempt).forEach(rec => {
+       let pointer = new Date(rec.next_date);
+       let attempts = 0;
+       while (pointer <= activePeriod.end && attempts < 100) {
+         if (pointer >= activePeriod.start && pointer <= activePeriod.end) {
+           const alreadyHandled = transactions.find(t => 
+             t.type === rec.type && 
+             t.category.toLowerCase() === rec.category.toLowerCase() &&
+             Math.abs(Number(t.amount) - Number(rec.amount)) < 1 &&
+             new Date(t.date) >= activePeriod.start
+           );
+
+           if (!alreadyHandled) {
+             if (rec.type === 'expense') {
+               expenseSum += Number(rec.amount);
+               expenseList.push({ category: rec.category, amount: Number(rec.amount), type: 'expense' });
+             } else {
+               incomeSum += Number(rec.amount);
+               incomeList.push({ category: rec.category, amount: Number(rec.amount), type: 'income' });
+             }
+           }
+         }
+         if (rec.frequency === 'monthly') pointer.setMonth(pointer.getMonth() + 1);
+         else if (rec.frequency === 'weekly') pointer.setDate(pointer.getDate() + 7);
+         else break;
+         attempts++;
+       }
     });
-    return Array.from(map.entries())
-      .map(([category, data]) => ({ category, ...data }))
-      .sort((a, b) => b.total - a.total);
-  };
 
-  const incomeCategories = groupByCategory(recurringIncomeItems);
-  const expenseCategories = groupByCategory(recurringExpenseItems);
+    return { 
+      expenseSum, 
+      incomeSum, 
+      expenseList: expenseList.sort((a,b) => b.amount - a.amount), 
+      incomeList: incomeList.sort((a,b) => b.amount - a.amount) 
+    };
+  }, [recurring, activePeriod, transactions]);
 
-  // ─── Upcoming Dates ──────────────────────────────────────
-  const upcomingMaturities = bankProcessed
-    .filter(a => a.account_type === 'term_deposit' && a.maturity_date && daysUntil(a.maturity_date, now) > 0)
-    .sort((a, b) => daysUntil(a.maturity_date!, now) - daysUntil(b.maturity_date!, now))
-    .slice(0, 3);
+  // Calculations for EOM Forecast (Factual Based)
+  const eomForecast = useMemo(() => {
+    const totalLimit = budgets.length > 0 ? budgets.reduce((a, b) => a + b.limit_amount, 0) : (currentMonthIncome || 5000);
+    
+    // Factual EOM Net = (Money I have/will have) - (Money I spent/will spend)
+    const expectedIncome = currentMonthIncome + pendingTransactionsData.incomeSum;
+    const expectedExpense = currentMonthExpense + pendingTransactionsData.expenseSum;
+    const projectedNet = expectedIncome - expectedExpense;
 
-  // ─── Credit Card Summary ────────────────────────────────
-  const currentMonthCCExpenses = ccExpenses.filter(e => {
-    const d = new Date(e.date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  });
-  const totalCurrentMonthCC = currentMonthCCExpenses.reduce((sum, e) => sum + e.amount, 0);
+    return {
+      projected: expectedExpense,
+      isOverBudget: expectedExpense > totalLimit,
+      remainingBudget: totalLimit,
+      projectedNet
+    };
+  }, [currentMonthExpense, currentMonthIncome, pendingTransactionsData, budgets]);
 
-  // ─── Goals Progress ──────────────────────────────────────
-  const topGoals = goals.slice(0, 3);
-
-  // ─── Budget Tracking ─────────────────────────────────────
   const budgetStatus = budgets.map(b => {
-    const spent = currentMonthTransactions
+    const spent = currentPeriodTransactions
       .filter(t => t.type === 'expense' && t.category.toLowerCase() === b.category.toLowerCase())
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + Number(t.amount), 0);
     const pct = b.limit_amount > 0 ? (spent / b.limit_amount) * 100 : 0;
     return { ...b, spent, pct };
   }).sort((a, b) => b.pct - a.pct).slice(0, 4);
 
-  // ─── AI Advisor ──────────────────────────────────────────
+  const topGoals = goals.slice(0, 3);
+
+
   const handleGetAdvice = async () => {
     setLoadingAdvice(true);
     setAdvice(null);
@@ -240,33 +326,53 @@ export const Dashboard = () => {
         currentMonthExpense,
         totalBankValue,
         totalBankInterest,
-        dailyInterestEarning: totalDailyInterest,
+        dailyInterestEarning: dailyDepositProfit,
         portfolioValue,
         savingsValue: totalVirtualValue,
-        recurringIncome,
-        recurringExpense,
-        netWorth: currentNetWorth || 0,
+        recurringIncome: recurring.filter(r => r.type === 'income').reduce((a,b) => a + Number(b.amount), 0),
+        recurringExpense: recurring.filter(r => r.type === 'expense').reduce((a,b) => a + Number(b.amount), 0),
+        netWorth: visibleNetWorth || 0,
       };
-      const response = await advisorAgent.getAdvice(currentMonthTransactions, budgets, goals, snapshot); 
+      const response = await advisorAgent.getAdvice(currentPeriodTransactions, budgets, goals, snapshot); 
       setAdvice(response);
       toast.success("AI Finansal analizi tamamlandı");
     } catch (err: any) { 
-      const msg = err?.message || 'Bilinmeyen hata';
-      toast.error(`AI analizi başarısız: ${msg}`); 
-      console.error('AI Advice Error:', err);
-    }
-    finally { setLoadingAdvice(false); }
+      toast.error("AI analizi başarısız oldu"); 
+    } finally { setLoadingAdvice(false); }
   };
 
-  // Net worth change from history
-  const lastValue = history.length >= 2 ? history[history.length - 2].total_value : null;
-  const netWorthChange = lastValue ? (currentNetWorth || 0) - lastValue : null;
-  const netWorthChangePct = lastValue && lastValue !== 0 ? ((netWorthChange || 0) / lastValue) * 100 : null;
+  const handleAskChat = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!chatQuestion.trim()) return;
+    setIsChatLoading(true);
+    setChatResponse(null);
+    try {
+      const snapshot = {
+        currentMonthIncome,
+        currentMonthExpense,
+        totalBankValue,
+        totalBankInterest,
+        dailyInterestEarning: dailyDepositProfit,
+        portfolioValue,
+        savingsValue: totalVirtualValue,
+        recurringIncome: recurring.filter(r => r.type === 'income').reduce((a,b) => a + Number(b.amount), 0),
+        recurringExpense: recurring.filter(r => r.type === 'expense').reduce((a,b) => a + Number(b.amount), 0),
+        netWorth: visibleNetWorth || 0,
+      };
+      const response = await advisorAgent.askQuestion(chatQuestion, snapshot);
+      setChatResponse(response);
+      setChatQuestion('');
+    } catch (err) {
+      toast.error("Sorun cevaplanamadı.");
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-5 md:space-y-6 pb-10">
 
-      {/* ─── HEADER ─────────────────────────────────────────── */}
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white font-display">Finansal Kokpit</h1>
@@ -276,741 +382,464 @@ export const Dashboard = () => {
         </div>
         <button 
           onClick={saveTodayNetWorth}
-          title="Bugünün tüm değerlerini geçmişe kaydet"
-          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[var(--color-surface-variant)]/40 border border-white/5 text-[var(--color-text-main)] rounded-full hover:bg-[var(--color-brand-primary)] hover:text-black font-medium transition-all backdrop-blur-md w-full sm:w-auto group"
+          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white/5 border border-white/5 text-white rounded-full hover:bg-[var(--color-brand-primary)] hover:text-black font-medium transition-all backdrop-blur-md"
         >
-          <RefreshCcw size={16} className="group-hover:animate-spin" /> Durumu Kaydet
+          <RefreshCcw size={16} /> Durumu Kaydet
         </button>
       </div>
 
-      {/* ─── PENDING RECURRING ──────────────────────────────── */}
       <PendingRecurringTransactions />
 
-      {/* ─── NET WORTH HERO + QUICK STATS ──────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5">
-        
-        {/* Main Net Worth Card */}
-        <div className="lg:col-span-5 primary-gradient-btn rounded-3xl p-6 md:p-7 relative overflow-hidden shadow-[0_10px_40px_rgba(78,222,163,0.12)] group">
-          <div className="absolute -right-10 -top-10 w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700 pointer-events-none"></div>
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-1">
-              <Shield size={14} className="text-black/50" />
-              <p className="text-black/60 font-bold text-[10px] uppercase tracking-widest font-mono">Toplam Net Varlık</p>
-            </div>
-            <h2 className="text-3xl lg:text-4xl font-black text-black font-display tracking-tight">
-              {formatMoney(currentNetWorth || 0)}
-            </h2>
-            {netWorthChange !== null && (
-              <div className={`mt-2 flex items-center gap-1.5 ${netWorthChange >= 0 ? 'text-black/70' : 'text-red-900/70'}`}>
-                {netWorthChange >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                <span className="text-xs font-bold font-mono">
-                  {netWorthChange >= 0 ? '+' : ''}{formatMoney(netWorthChange)}
-                </span>
-                {netWorthChangePct !== null && (
-                  <span className="text-[10px] font-mono opacity-70">
-                    ({netWorthChangePct >= 0 ? '+' : ''}{netWorthChangePct.toFixed(1)}%)
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Mini Breakdown - Clickable */}
-            <div className="grid grid-cols-2 gap-2 mt-5">
-              <button
-                onClick={() => toggleBreakdown('banks')}
-                className={`bg-black/5 rounded-xl p-2.5 border text-left transition-all duration-200 hover:bg-black/10 hover:scale-[1.02] active:scale-[0.98] ${
-                  expandedBreakdown === 'banks' ? 'border-black/20 bg-black/10 ring-1 ring-black/10' : 'border-black/5'
-                }`}
-              >
-                <p className="text-[9px] text-black/60 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1">
-                  <Landmark size={10}/> Bankalar
-                  <ChevronDown size={8} className={`ml-auto transition-transform duration-300 ${expandedBreakdown === 'banks' ? 'rotate-180' : ''}`} />
-                </p>
-                <p className="font-bold text-black font-mono text-sm">{formatCompact(totalBankValue)}</p>
-              </button>
-              <button
-                onClick={() => toggleBreakdown('investments')}
-                className={`bg-black/5 rounded-xl p-2.5 border text-left transition-all duration-200 hover:bg-black/10 hover:scale-[1.02] active:scale-[0.98] ${
-                  expandedBreakdown === 'investments' ? 'border-black/20 bg-black/10 ring-1 ring-black/10' : 'border-black/5'
-                }`}
-              >
-                <p className="text-[9px] text-black/60 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1">
-                  <Activity size={10}/> Yatırım
-                  <ChevronDown size={8} className={`ml-auto transition-transform duration-300 ${expandedBreakdown === 'investments' ? 'rotate-180' : ''}`} />
-                </p>
-                <p className="font-bold text-black font-mono text-sm">{formatCompact(portfolioValue)}</p>
-              </button>
-              <button
-                onClick={() => toggleBreakdown('savings')}
-                className={`bg-black/5 rounded-xl p-2.5 border text-left transition-all duration-200 hover:bg-black/10 hover:scale-[1.02] active:scale-[0.98] ${
-                  expandedBreakdown === 'savings' ? 'border-black/20 bg-black/10 ring-1 ring-black/10' : 'border-black/5'
-                }`}
-              >
-                <p className="text-[9px] text-black/60 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1">
-                  <PiggyBank size={10}/> Birikim
-                  <ChevronDown size={8} className={`ml-auto transition-transform duration-300 ${expandedBreakdown === 'savings' ? 'rotate-180' : ''}`} />
-                </p>
-                <p className="font-bold text-black font-mono text-sm">{formatCompact(totalVirtualValue)}</p>
-              </button>
-              <button
-                onClick={() => toggleBreakdown('interest')}
-                className={`bg-black/5 rounded-xl p-2.5 border text-left transition-all duration-200 hover:bg-black/10 hover:scale-[1.02] active:scale-[0.98] ${
-                  expandedBreakdown === 'interest' ? 'border-black/20 bg-black/10 ring-1 ring-black/10' : 'border-black/5'
-                }`}
-              >
-                <p className="text-[9px] text-black/60 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1">
-                  <Percent size={10}/> Faiz Geliri
-                  <ChevronDown size={8} className={`ml-auto transition-transform duration-300 ${expandedBreakdown === 'interest' ? 'rotate-180' : ''}`} />
-                </p>
-                <p className="font-bold text-black font-mono text-sm">+{formatCompact(totalBankInterest)}</p>
-              </button>
-            </div>
-
-            {/* Expanded Detail Panel */}
-            {expandedBreakdown && (
-              <div className="mt-3 bg-black/10 rounded-xl border border-black/10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-black/5">
-                  <span className="text-[10px] font-bold text-black/70 uppercase tracking-wider">
-                    {expandedBreakdown === 'banks' && '🏦 Banka Hesapları Detayı'}
-                    {expandedBreakdown === 'investments' && '📈 Yatırım Portföyü Detayı'}
-                    {expandedBreakdown === 'savings' && '🐷 Birikim Detayı'}
-                    {expandedBreakdown === 'interest' && '💰 Faiz Geliri Detayı'}
-                  </span>
-                  <button onClick={() => setExpandedBreakdown(null)} className="text-black/40 hover:text-black/70 transition-colors">
-                    <X size={12} />
-                  </button>
-                </div>
-                <div className="px-3 py-2 max-h-[200px] overflow-y-auto custom-scrollbar space-y-1.5">
-                  
-                  {/* Banks Detail */}
-                  {expandedBreakdown === 'banks' && (
-                    bankProcessed.length > 0 ? bankProcessed.map(acc => (
-                      <div key={acc.id} className="flex items-center justify-between py-1.5 px-2 bg-black/5 rounded-lg">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
-                            acc.account_type === 'daily_deposit' ? 'bg-emerald-500/20 text-emerald-700' :
-                            acc.account_type === 'term_deposit' ? 'bg-purple-500/20 text-purple-700' :
-                            'bg-blue-500/20 text-blue-700'
-                          }`}>
-                            {acc.account_type === 'checking' ? <Wallet size={10}/> :
-                             acc.account_type === 'daily_deposit' ? <TrendingUp size={10}/> :
-                             <Clock size={10}/>}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[11px] font-bold text-black/80 truncate max-w-[100px]">{acc.name}</p>
-                            <p className="text-[9px] text-black/50 font-mono">
-                              {acc.account_type === 'checking' ? 'Vadesiz' : acc.account_type === 'daily_deposit' ? 'Günlük' : 'Vadeli'}
-                              {acc.interest_rate ? ` • %${acc.interest_rate}` : ''}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-[11px] font-bold font-mono text-black/80">{formatCompact(acc.currentValue)}</p>
-                          {acc.netInterest > 0 && (
-                            <p className="text-[9px] font-mono text-emerald-700">+{formatMoney(acc.netInterest)}</p>
-                          )}
-                        </div>
-                      </div>
-                    )) : (
-                      <p className="text-[11px] text-black/50 text-center py-3">Henüz banka hesabı eklenmedi</p>
-                    )
-                  )}
-
-                  {/* Investments Detail */}
-                  {expandedBreakdown === 'investments' && (
-                    investments.length > 0 ? investments.map(inv => {
-                      const value = inv.quantity * inv.current_price;
-                      const cost = inv.quantity * (inv.avg_price || inv.current_price);
-                      const pnl = value - cost;
-                      const pnlPct = cost > 0 ? (pnl / cost) * 100 : 0;
-                      return (
-                        <div key={inv.id} className="flex items-center justify-between py-1.5 px-2 bg-black/5 rounded-lg">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
-                              inv.asset_type === 'stock' ? 'bg-blue-500/20 text-blue-700' :
-                              inv.asset_type === 'crypto' ? 'bg-orange-500/20 text-orange-700' :
-                              inv.asset_type === 'commodity' ? 'bg-yellow-500/20 text-yellow-700' :
-                              'bg-green-500/20 text-green-700'
-                            }`}>
-                              <Activity size={10}/>
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-[11px] font-bold text-black/80 truncate max-w-[100px]">{inv.name}</p>
-                              <p className="text-[9px] text-black/50 font-mono">{inv.symbol} • {inv.quantity.toFixed(inv.asset_type === 'crypto' ? 4 : 2)} adet</p>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-[11px] font-bold font-mono text-black/80">{formatCompact(value)}</p>
-                            <p className={`text-[9px] font-mono font-bold ${pnl >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                              {pnl >= 0 ? '+' : ''}{formatCompact(pnl)} ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%)
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    }) : (
-                      <p className="text-[11px] text-black/50 text-center py-3">Henüz yatırım eklenmedi</p>
-                    )
-                  )}
-
-                  {/* Savings Detail */}
-                  {expandedBreakdown === 'savings' && (
-                    combinedSavings.length > 0 ? combinedSavings.map(sav => {
-                      const value = sav.quantity * sav.current_price;
-                      return (
-                        <div key={sav.id} className="flex items-center justify-between py-1.5 px-2 bg-black/5 rounded-lg">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 bg-pink-500/20 text-pink-700">
-                              <PiggyBank size={10}/>
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-[11px] font-bold text-black/80 truncate max-w-[100px]">{sav.name}</p>
-                              <p className="text-[9px] text-black/50 font-mono">{sav.symbol}</p>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-[11px] font-bold font-mono text-black/80">{formatCompact(value)}</p>
-                          </div>
-                        </div>
-                      );
-                    }) : (
-                      <p className="text-[11px] text-black/50 text-center py-3">Henüz birikim eklenmedi</p>
-                    )
-                  )}
-
-                  {/* Interest Detail */}
-                  {expandedBreakdown === 'interest' && (
-                    bankProcessed.filter(a => a.netInterest > 0).length > 0 ? 
-                    bankProcessed.filter(a => a.netInterest > 0).map(acc => (
-                      <div key={acc.id} className="flex items-center justify-between py-1.5 px-2 bg-black/5 rounded-lg">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 bg-emerald-500/20 text-emerald-700">
-                            <Percent size={10}/>
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[11px] font-bold text-black/80 truncate max-w-[100px]">{acc.name}</p>
-                            <p className="text-[9px] text-black/50 font-mono">
-                              %{acc.interest_rate} • {acc.daysAccrued} gün
-                              {acc.account_type === 'term_deposit' && acc.maturity_date && daysUntil(acc.maturity_date, now) > 0
-                                ? ` • ${daysUntil(acc.maturity_date, now)}g kaldı`
-                                : ''}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-[11px] font-bold font-mono text-emerald-700">+{formatMoney(acc.netInterest)}</p>
-                          <p className="text-[9px] text-black/50 font-mono">günlük: +{formatMoney(
-                            acc.account_type === 'daily_deposit'
-                              ? (Math.max(0, acc.balance - acc.exempt_amount) * ((acc.interest_rate || 0) / 100) / 365) * (1 - (acc.tax_rate || 0) / 100)
-                              : (acc.balance * ((acc.interest_rate || 0) / 100) / 365) * (1 - (acc.tax_rate || 0) / 100)
-                          )}</p>
-                        </div>
-                      </div>
-                    )) : (
-                      <p className="text-[11px] text-black/50 text-center py-3">Faiz geliri olan hesap bulunmuyor</p>
-                    )
-                  )}
-                </div>
-                {/* Footer with navigation */}
-                <div className="px-3 py-2 border-t border-black/5">
-                  <button
-                    onClick={() => {
-                      if (expandedBreakdown === 'banks') navigate('/banks');
-                      else if (expandedBreakdown === 'investments') navigate('/investments');
-                      else if (expandedBreakdown === 'savings') navigate('/net-worth');
-                      else if (expandedBreakdown === 'interest') navigate('/banks');
-                    }}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold text-black/60 hover:text-black transition-colors rounded-lg hover:bg-black/5"
-                  >
-                    Detaylı Görüntüle <ChevronRight size={10} />
-                  </button>
-                </div>
-              </div>
-            )}
+      {/* INSIGHT BAR */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {budgetAlerts > 0 && (
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-orange-500/10 border border-orange-500/20 rounded-2xl">
+            <AlertTriangle className="text-orange-500" size={16} />
+            <span className="text-[11px] font-bold text-orange-200 uppercase tracking-wide">{budgetAlerts} bütçe zorlanıyor!</span>
           </div>
+        )}
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-[#4edeb3]/10 border border-[#4edeb3]/20 rounded-2xl">
+          <Zap className="text-[#4edeb3]" size={16} />
+          <span className="text-[11px] font-bold text-[#4edeb3] uppercase tracking-wide">Günlük {formatMoney(dailyDepositProfit)} Mevduat Karı</span>
         </div>
-
-        {/* Right: Quick Insight Cards */}
-        <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
-          
-          {/* This Month Net */}
-          <div className="bento-card flex flex-col justify-between min-h-[130px] sm:min-h-0">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${currentMonthNet >= 0 ? 'bg-[#4edeb3]/10 text-[#4edeb3]' : 'bg-[#ff7886]/10 text-[#ff7886]'}`}>
-              {currentMonthNet >= 0 ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
-            </div>
-            <div>
-              <p className="text-[9px] text-[var(--color-text-variant)] uppercase tracking-wider font-bold font-mono mb-1">Bu Ay Net</p>
-              <p className={`font-black font-mono text-lg ${currentMonthNet >= 0 ? 'text-[#4edeb3]' : 'text-[#ff7886]'}`}>
-                {currentMonthNet >= 0 ? '+' : ''}{formatCompact(currentMonthNet)}
-              </p>
-            </div>
-          </div>
-
-          {/* Daily Interest Earning */}
-          <div className="bento-card flex flex-col justify-between min-h-[130px] sm:min-h-0">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 bg-[#cda4ff]/10 text-[#cda4ff]">
-              <Zap size={20} />
-            </div>
-            <div>
-              <p className="text-[9px] text-[var(--color-text-variant)] uppercase tracking-wider font-bold font-mono mb-1">Günlük Faiz</p>
-              <p className="font-black font-mono text-lg text-[#cda4ff]">
-                +{formatMoney(totalDailyInterest)}
-              </p>
-            </div>
-          </div>
-
-          {/* Recurring Balance */}
-          <div className="bento-card flex flex-col justify-between min-h-[130px] sm:min-h-0">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${recurringNet >= 0 ? 'bg-[#adc6ff]/10 text-[#adc6ff]' : 'bg-[#ffcf70]/10 text-[#ffcf70]'}`}>
-              <CalendarDays size={20} />
-            </div>
-            <div>
-              <p className="text-[9px] text-[var(--color-text-variant)] uppercase tracking-wider font-bold font-mono mb-1">Sabit Net</p>
-              <p className={`font-black font-mono text-lg ${recurringNet >= 0 ? 'text-[#adc6ff]' : 'text-[#ffcf70]'}`}>
-                {recurringNet >= 0 ? '+' : ''}{formatCompact(recurringNet)}
-              </p>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[9px] font-mono text-[#4edeb3]">↑{formatCompact(recurringIncome)}</span>
-                <span className="text-[9px] font-mono text-[#ff7886]">↓{formatCompact(recurringExpense)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Credit Card */}
-          <div className="bento-card flex flex-col justify-between min-h-[130px] sm:min-h-0">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 bg-[#ff7886]/10 text-[#ff7886]">
-              <CreditCard size={20} />
-            </div>
-            <div>
-              <p className="text-[9px] text-[var(--color-text-variant)] uppercase tracking-wider font-bold font-mono mb-1">KK Harcama</p>
-              <p className="font-black font-mono text-lg text-[#ff7886]">
-                {formatCompact(totalCurrentMonthCC)}
-              </p>
-            </div>
-          </div>
-
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+          <Clock className="text-blue-500" size={16} />
+          <span className="text-[11px] font-bold text-blue-200 uppercase tracking-wide">{activePeriod.start.toLocaleDateString('tr-TR')} - {activePeriod.end.toLocaleDateString('tr-TR')}</span>
         </div>
       </div>
 
-      {/* ─── MAIN GRID ──────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5">
+      {/* HERO SECTION */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
-        {/* LEFT: Charts & Analysis */}
-        <div className="lg:col-span-8 space-y-4 md:space-y-5">
-          
-          {/* 6-Month Income vs Expense */}
-          <div className="bento-card">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono flex items-center gap-2">
-                <BarChart3 size={14} className="text-[var(--color-brand-primary)]" /> Son 6 Aylık Gelir & Gider
-              </h3>
-              <div className="flex items-center gap-3 text-[10px] font-mono">
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#4edeb3]"></span> Gelir</span>
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#ff7886]"></span> Gider</span>
+        {/* Net Worth Control Card */}
+        <div className="lg:col-span-12 xl:col-span-5 primary-gradient-btn rounded-3xl p-6 md:p-8 relative overflow-hidden group shadow-2xl">
+          <div className="absolute -right-20 -top-20 w-80 h-80 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-2 opacity-60">
+              <Shield size={14} />
+              <p className="text-[10px] font-bold uppercase tracking-widest font-mono">Toplam Varlık Portföyü</p>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-black text-black font-display tracking-tight mb-8">
+              {formatMoney(assetVisibility.cards ? visibleNetWorth - cardDebt : visibleNetWorth)}
+            </h2>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              {[
+                { key: 'banks', label: 'Banka', val: totalBankValue, act: assetVisibility.banks },
+                { key: 'investments', label: 'Yatırım', val: portfolioValue, act: assetVisibility.investments },
+                { key: 'savings', label: 'Birikim', val: totalVirtualValue, act: assetVisibility.savings },
+                { key: 'cards', label: 'Kredi Borcu', val: cardDebt, act: assetVisibility.cards }
+              ].map(item => (
+                <div key={item.key} className="flex flex-col gap-1">
+                  <button
+                    onClick={() => {
+                      if (item.key === 'banks') {
+                        setIsBankModalOpen(true);
+                        setAssetVisibility(v => ({ ...v, banks: true }));
+                      } else {
+                        setAssetVisibility(v => ({ ...v, [item.key]: !v[item.key as keyof typeof v] }));
+                      }
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all w-full ${item.act && (item.key !== 'banks' || selectedBankIds.length > 0) ? 'bg-black/5 border-black/10' : 'bg-transparent border-black/5 opacity-40 grayscale'}`}
+                  >
+                    <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest font-mono mb-1">{item.label}</p>
+                    <p className="text-sm font-bold text-black font-mono">{formatCompact(item.val)}</p>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {expandedBreakdown === 'interest' && (
+              <div className="mt-4 bg-black/10 rounded-2xl border border-black/10 p-4 animate-in slide-in-from-top-4">
+                <div className="flex items-center justify-between mb-4 border-b border-black/5 pb-2">
+                  <span className="text-[10px] font-bold uppercase opacity-60 flex items-center gap-2">
+                    <LayoutList size={12} /> Faiz Detayları
+                  </span>
+                  <X size={14} className="cursor-pointer opacity-40 hover:opacity-100" onClick={() => setExpandedBreakdown(null)} />
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                  {bankProcessed.filter(a => a.netInterest > 0).map(acc => (
+                    <div key={acc.id} className="flex justify-between items-center text-xs p-1">
+                      <span className="font-medium">{acc.name}</span>
+                      <span className="font-mono font-bold text-emerald-800">+{formatMoney(acc.netInterest)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Actionable Insights Grid */}
+        <div className="lg:col-span-12 xl:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bento-card flex flex-col justify-between min-h-[140px]">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${currentMonthNet >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+              {currentMonthNet >= 0 ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--color-text-variant)] font-bold uppercase mb-1">Dönem Net</p>
+              <p className={`font-mono text-2xl font-black ${currentMonthNet >= 0 ? 'text-[#4edeb3]' : 'text-red-400'}`}>
+                {formatCompact(currentMonthNet)}
+              </p>
+            </div>
+          </div>
+
+          <div className="bento-card flex flex-col justify-between min-h-[140px]">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+              <Zap size={24} />
+            </div>
+            <div>
+              <p className="text-[10px] text-[var(--color-text-variant)] font-bold uppercase mb-1">Günlük Kar</p>
+              <p className="font-mono text-2xl font-black text-purple-400">+{formatMoney(dailyDepositProfit)}</p>
+            </div>
+          </div>
+
+          <div className="bento-card flex flex-col min-h-[140px] group transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center"><CreditCard size={18}/></div>
+              <p className="text-[9px] font-bold uppercase opacity-40">CC Borç</p>
+            </div>
+            <div className="space-y-1.5 overflow-hidden">
+              <p className="font-mono text-lg font-black text-white">{formatCompact(creditCardSummary.totalDebt)}</p>
+              <div className="space-y-1 transition-all">
+                {creditCardSummary.cardsList.slice(0, 2).map((c, i) => (
+                  <div key={i} className="flex justify-between text-[10px] opacity-40 leading-tight">
+                    <span className="truncate max-w-[60px]">{c.name}</span>
+                    <span className="font-mono">{formatCompact(c.current_debt || 0)}</span>
+                  </div>
+                ))}
               </div>
             </div>
+          </div>
+
+          <div className="bento-card flex flex-col min-h-[140px] group">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-8 h-8 rounded-lg bg-yellow-500/10 text-yellow-500 flex items-center justify-center"><Clock size={18}/></div>
+              <p className="text-[9px] font-bold uppercase opacity-40">Bekleyen</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="font-mono text-lg font-black text-yellow-400">
+                {formatCompact(pendingTransactionsData.expenseSum - pendingTransactionsData.incomeSum)}
+              </p>
+              <div className="space-y-1">
+                {pendingTransactionsData.expenseList.slice(0, 2).map((e, i) => (
+                  <div key={i} className="flex justify-between text-[10px] opacity-40 leading-tight">
+                    <span className="truncate max-w-[60px]">{e.category}</span>
+                    <span className="font-mono text-red-500">-{formatCompact(e.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Analysis Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
+        
+        {/* Charts & Trends */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          {/* AI Chat Card */}
+          <div className="bento-card bg-gradient-to-br from-purple-500/10 to-indigo-500/5 border border-purple-500/20 overflow-hidden">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                <MessageSquare size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-widest font-mono">AI Finansal Asistan</h3>
+                <p className="text-[10px] opacity-40 font-bold uppercase">Verilerini analiz edeyim</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <AnimatePresence mode="wait">
+                {chatResponse && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 bg-white/5 rounded-2xl border border-white/10 text-sm text-purple-50 leading-relaxed whitespace-pre-wrap relative group"
+                  >
+                    <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-purple-400/60 uppercase">
+                       <Bot size={12} /> Asistan Yanıtı
+                    </div>
+                    {chatResponse}
+                    <button 
+                      onClick={() => setChatResponse(null)}
+                      className="absolute top-2 right-2 p-1 hover:bg-white/10 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X size={12} />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <form onSubmit={handleAskChat} className="relative mt-2">
+                <input
+                  type="text"
+                  value={chatQuestion}
+                  onChange={(e) => setChatQuestion(e.target.value)}
+                  placeholder="Altın yatırımı mantıklı mı? En çok nereye para gidiyor?"
+                  className="w-full bg-black/20 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-purple-500/40 transition-all pr-12"
+                  disabled={isChatLoading}
+                />
+                <button 
+                  type="submit"
+                  disabled={isChatLoading || !chatQuestion.trim()}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-purple-500 text-black rounded-xl flex items-center justify-center hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
+                >
+                  {isChatLoading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+                </button>
+              </form>
+              
+              <div className="flex flex-wrap gap-2 pt-2">
+                {['En büyük giderim ne?', 'Tasarruf önerisi', 'Borç durumum nasıl?'].map(label => (
+                  <button 
+                    key={label}
+                    onClick={() => {
+                        setChatQuestion(label);
+                        // Trigger submit somehow or let the user click arrow
+                    }}
+                    className="text-[10px] font-bold px-3 py-1.5 bg-white/5 border border-white/5 rounded-full text-white/40 hover:text-white/100 hover:border-white/20 transition-all"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="bento-card">
+            <h3 className="text-xs font-bold uppercase tracking-widest font-mono mb-8 flex items-center gap-2">
+              <BarChart3 size={16} className="text-[#4edeb3]" /> Aylık Gelir & Gider Karşılaştırması
+            </h3>
             <MonthlyBarChart data={monthlyBarData} />
           </div>
 
-          {/* This Month Overview + Pie */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-            
-            {/* Cash Flow Box */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="bento-card">
-              <h3 className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono mb-5">
-                {now.toLocaleDateString('tr-TR', { month: 'long' })} Nakit Akışı
-              </h3>
-              
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-[var(--color-surface-lowest)] border border-white/5 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#4edeb3]/10 text-[#4edeb3] flex items-center justify-center">
-                      <ArrowUpRight size={16} />
+              <h3 className="text-xs font-bold uppercase tracking-widest font-mono mb-6 text-[var(--color-text-variant)]">Nakit Akışı (15'inden Beri)</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center"><ArrowUpRight size={20}/></div>
+                    <div>
+                      <p className="text-xs font-bold">Girişler</p>
+                      <p className="text-[10px] opacity-40">Toplam Gelir</p>
                     </div>
-                    <span className="text-sm text-[var(--color-text-variant)]">Gelir</span>
                   </div>
-                  <span className="font-bold font-mono text-[#4edeb3]">{formatMoney(currentMonthIncome)}</span>
+                  <span className="font-mono font-bold text-emerald-400">{formatMoney(currentMonthIncome)}</span>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-[var(--color-surface-lowest)] border border-white/5 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#ff7886]/10 text-[#ff7886] flex items-center justify-center">
-                      <ArrowDownRight size={16} />
+                <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center"><ArrowDownRight size={20}/></div>
+                    <div>
+                      <p className="text-xs font-bold">Çıkışlar</p>
+                      <p className="text-[10px] opacity-40">Toplam Gider</p>
                     </div>
-                    <span className="text-sm text-[var(--color-text-variant)]">Gider</span>
                   </div>
-                  <span className="font-bold font-mono text-[#ff7886]">{formatMoney(currentMonthExpense)}</span>
+                  <span className="font-mono font-bold text-red-400">{formatMoney(currentMonthExpense)}</span>
                 </div>
-                
-                <div className="border-t border-white/5 pt-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-[var(--color-text-variant)] font-bold uppercase tracking-wider">Net</span>
-                    <span className={`font-black font-mono text-lg ${currentMonthNet >= 0 ? 'text-[#4edeb3]' : 'text-[#ff7886]'}`}>
-                      {currentMonthNet >= 0 ? '+' : ''}{formatMoney(currentMonthNet)}
-                    </span>
-                  </div>
+                <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                  <span className="text-[10px] font-bold uppercase opacity-50">Dönem Net Durumu</span>
+                  <span className={`font-mono text-2xl font-black ${currentMonthNet >= 0 ? 'text-[#4edeb3]' : 'text-red-400'}`}>
+                    {formatMoney(currentMonthNet)}
+                  </span>
                 </div>
-
-                {/* Savings rate */}
-                {currentMonthIncome > 0 && (
-                  <div className="bg-[var(--color-brand-primary)]/5 border border-[var(--color-brand-primary)]/10 rounded-xl p-3">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] text-[var(--color-text-variant)] uppercase tracking-wider font-bold">Tasarruf Oranı</span>
-                      <span className="text-[var(--color-brand-primary)] font-black font-mono text-sm">
-                        %{Math.max(0, (currentMonthNet / currentMonthIncome) * 100).toFixed(0)}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-[var(--color-brand-primary)] rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, Math.max(0, (currentMonthNet / currentMonthIncome) * 100))}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Expense Pie */}
             <div className="bento-card">
-              <h3 className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono mb-4">
-                Harcama Dağılımı
-              </h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest font-mono mb-6 text-[var(--color-text-variant)]">Kategori Bazlı Harcamalar</h3>
               {expenseData.length > 0 ? (
                 <ExpensePieChart data={expenseData} compact />
               ) : (
-                <div className="h-52 flex items-center justify-center text-[var(--color-text-variant)] text-sm">
-                  Bu ay henüz harcama yok
+                <div className="h-44 flex flex-col items-center justify-center opacity-30 text-xs italic">
+                  <Activity size={32} className="mb-2" /> Harcama verisi bulunamadı
                 </div>
               )}
             </div>
           </div>
 
-          {/* Net Worth Chart */}
           <div className="bento-card">
-            <h3 className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono mb-5 flex items-center gap-2">
-              <TrendingUp size={14} className="text-[var(--color-brand-primary)]" /> Net Varlık Geçmişi
+            <h3 className="text-xs font-bold uppercase tracking-widest font-mono mb-6 text-[var(--color-text-variant)] flex items-center gap-2">
+              <TrendingUp size={16} className="text-[#cda4ff]" /> Varlık Gelişim Grafiği
             </h3>
             {history && history.length > 1 ? (
               <NetWorthLineChart history={history} />
             ) : (
-              <div className="flex flex-col items-center justify-center h-[200px] bg-[var(--color-surface-lowest)] rounded-2xl border border-white/5 border-dashed gap-3 text-center p-6">
-                <Activity size={28} className="text-[var(--color-text-variant)] opacity-40" />
-                <p className="text-xs text-[var(--color-text-variant)]">
-                  "Durumu Kaydet" ile gün gün varlık grafiğinizi oluşturun.
-                </p>
-              </div>
+              <div className="h-44 flex items-center justify-center text-xs opacity-30 italic font-mono">Veri toplanmaya devam ediyor...</div>
             )}
           </div>
         </div>
 
-        {/* RIGHT: Sidebar */}
-        <div className="lg:col-span-4 space-y-4 md:space-y-5">
-
-          {/* Banka Hesapları Özeti */}
+        {/* Sidebar Cards */}
+        <div className="lg:col-span-4 space-y-6">
+          
           <div className="bento-card">
-            <h3 className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono mb-4 flex items-center gap-2">
-              <Landmark size={14} className="text-[#cda4ff]" /> Banka Hesapları
+            <h3 className="text-xs font-bold uppercase tracking-widest font-mono mb-4 flex items-center gap-2">
+              <Landmark size={14} className="text-blue-400" /> Hesaplar
             </h3>
-            {bankProcessed.length === 0 ? (
-              <p className="text-[var(--color-text-variant)] text-sm text-center py-4">Henüz hesap eklenmedi</p>
-            ) : (
-              <div className="space-y-2.5">
-                {bankProcessed.map(acc => {
-                  const isMatured = acc.account_type === 'term_deposit' && acc.maturity_date && daysUntil(acc.maturity_date, now) <= 0;
-                  return (
-                    <div key={acc.id} className="p-3 bg-[var(--color-surface-lowest)] border border-white/5 rounded-xl hover:border-white/10 transition-colors">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                            acc.account_type === 'daily_deposit' ? 'bg-[#4edeb3]/10 text-[#4edeb3]' :
-                            acc.account_type === 'term_deposit' ? 'bg-[#cda4ff]/10 text-[#cda4ff]' :
-                            'bg-[#adc6ff]/10 text-[#adc6ff]'
-                          }`}>
-                            {acc.account_type === 'checking' ? <Wallet size={12}/> :
-                             acc.account_type === 'daily_deposit' ? <TrendingUp size={12}/> :
-                             <Clock size={12}/>}
-                          </div>
-                          <span className="text-sm font-bold text-white truncate max-w-[120px]">{acc.name}</span>
-                        </div>
-                        <span className="font-mono font-bold text-white text-sm">{formatCompact(acc.currentValue)}</span>
-                      </div>
-                      {acc.netInterest > 0 && (
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-[10px] text-[var(--color-text-variant)] font-mono">
-                            {acc.interest_rate && `%${acc.interest_rate}`} • {acc.daysAccrued}g
-                          </span>
-                          <span className="text-[10px] text-[#4edeb3] font-mono font-bold">+{formatMoney(acc.netInterest)}</span>
-                        </div>
-                      )}
-                      {isMatured && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <CheckCircle2 size={10} className="text-[#4edeb3]" />
-                          <span className="text-[10px] text-[#4edeb3] font-bold">Vadesi Doldu</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <div className="space-y-3">
+              {bankProcessed.slice(0, 4).map(acc => (
+                <div key={acc.id} className="p-3 bg-white/5 border border-white/5 rounded-xl flex items-center justify-between hover:border-white/10 transition-colors">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold truncate">{acc.name}</p>
+                    <p className="text-[9px] opacity-40 font-mono">%{acc.interest_rate || 0}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-bold font-mono">{formatCompact(acc.currentValue)}</p>
+                    {acc.netInterest > 0 && <p className="text-[9px] text-emerald-400 font-mono">+{formatCompact(acc.netInterest)}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Sabit Gelir & Gider Kategorize */}
-          {(recurringIncomeItems.length > 0 || recurringExpenseItems.length > 0) && (
-            <div className="bento-card">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono flex items-center gap-2">
-                  <Banknote size={14} className="text-[#adc6ff]" /> Sabit Gelir & Gider
-                </h3>
-                <button 
-                  onClick={() => navigate('/recurring')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-[var(--color-brand-primary)]/10 border border-white/10 hover:border-[var(--color-brand-primary)]/20 rounded-lg text-[10px] font-bold text-[var(--color-text-variant)] hover:text-[var(--color-brand-primary)] transition-all"
-                >
-                  <Pencil size={10} /> Düzenle
-                </button>
-              </div>
-
-              {/* Income vs Expense Bar */}
-              {recurringIncome > 0 && (
-                <div className="mb-4">
-                  <div className="flex justify-between text-[10px] font-mono mb-1.5">
-                    <span className="text-[#4edeb3] font-bold">Gelir: {formatMoney(recurringIncome)}</span>
-                    <span className="text-[#ff7886] font-bold">Gider: {formatMoney(recurringExpense)}</span>
-                  </div>
-                  <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden flex">
-                    <div 
-                      className="h-full bg-[#4edeb3] rounded-l-full transition-all"
-                      style={{ width: `${(recurringIncome / (recurringIncome + recurringExpense)) * 100}%` }}
-                    />
-                    <div 
-                      className="h-full bg-[#ff7886] rounded-r-full transition-all"
-                      style={{ width: `${(recurringExpense / (recurringIncome + recurringExpense)) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Income Categories */}
-              {incomeCategories.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-[10px] text-[#4edeb3] font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <ArrowUpRight size={10} /> Gelirler
-                  </p>
-                  <div className="space-y-1.5">
-                    {incomeCategories.map(cat => (
-                      <div key={cat.category} className="flex items-center justify-between p-2 bg-[#4edeb3]/5 border border-[#4edeb3]/10 rounded-lg">
-                        <span className="text-xs text-white font-medium truncate max-w-[140px]">{cat.category}</span>
-                        <span className="text-xs font-mono font-bold text-[#4edeb3] shrink-0">+{formatMoney(cat.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Expense Categories */}
-              {expenseCategories.length > 0 && (
-                <div>
-                  <p className="text-[10px] text-[#ff7886] font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <ArrowDownRight size={10} /> Giderler
-                  </p>
-                  <div className="space-y-1.5">
-                    {expenseCategories.map(cat => (
-                      <div key={cat.category} className="flex items-center justify-between p-2 bg-[#ff7886]/5 border border-[#ff7886]/10 rounded-lg">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-xs text-white font-medium truncate max-w-[120px]">{cat.category}</span>
-                          {cat.items[0]?.total_installments && (
-                            <span className="text-[9px] font-mono text-[var(--color-text-variant)] opacity-70 shrink-0">
-                              ({cat.items[0].total_installments}T)
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs font-mono font-bold text-[#ff7886] shrink-0">-{formatMoney(cat.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Net Summary */}
-              <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
-                <span className="text-xs text-[var(--color-text-variant)] font-bold">Net Sabit</span>
-                <span className={`font-mono font-black text-sm ${recurringNet >= 0 ? 'text-[#4edeb3]' : 'text-[#ff7886]'}`}>
-                  {recurringNet >= 0 ? '+' : ''}{formatMoney(recurringNet)}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Bütçe Takibi */}
           {budgetStatus.length > 0 && (
             <div className="bento-card">
-              <h3 className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono mb-4 flex items-center gap-2">
-                <Target size={14} className="text-[#ffcf70]" /> Bütçe Takibi
-              </h3>
-              <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-widest font-mono mb-4">Bütçeler</h3>
+              <div className="space-y-5">
                 {budgetStatus.map(b => (
                   <div key={b.id}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm text-white font-medium truncate max-w-[150px]">{b.category}</span>
-                      <span className="text-[10px] font-mono text-[var(--color-text-variant)]">
-                        {formatCompact(b.spent)} / {formatCompact(b.limit_amount)}
-                      </span>
+                    <div className="flex justify-between items-center mb-1.5 text-[10px] font-bold">
+                      <span className="uppercase tracking-tighter">{b.category}</span>
+                      <span className="opacity-40 font-mono">%{b.pct.toFixed(0)}</span>
                     </div>
-                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                       <div 
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          b.pct > 100 ? 'bg-[#ff7886]' : b.pct > 80 ? 'bg-[#ffcf70]' : 'bg-[#4edeb3]'
-                        }`}
+                        className={`h-full transition-all duration-500 rounded-full ${b.pct > 100 ? 'bg-red-500' : b.pct > 80 ? 'bg-yellow-500' : 'bg-emerald-500'}`}
                         style={{ width: `${Math.min(100, b.pct)}%` }}
                       />
                     </div>
-                    {b.pct > 90 && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <AlertTriangle size={10} className={b.pct > 100 ? 'text-[#ff7886]' : 'text-[#ffcf70]'} />
-                        <span className={`text-[10px] font-bold ${b.pct > 100 ? 'text-[#ff7886]' : 'text-[#ffcf70]'}`}>
-                          {b.pct > 100 ? `%${(b.pct - 100).toFixed(0)} aşıldı!` : `%${b.pct.toFixed(0)} kullanıldı`}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Hedefler */}
-          {topGoals.length > 0 && (
-            <div className="bento-card">
-              <h3 className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono mb-4 flex items-center gap-2">
-                <Target size={14} className="text-[#4edeb3]" /> Hedeflerim
-              </h3>
-              <div className="space-y-3">
-                {topGoals.map(g => {
-                  const pct = g.target_amount > 0 ? (g.current_amount / g.target_amount) * 100 : 0;
-                  return (
-                    <div key={g.id} className="p-3 bg-[var(--color-surface-lowest)] border border-white/5 rounded-xl">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-bold text-white truncate max-w-[160px]">{g.name}</span>
-                        <span className="text-[10px] text-[var(--color-brand-primary)] font-mono font-bold">%{pct.toFixed(0)}</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden mb-1.5">
-                        <div className="h-full bg-gradient-to-r from-[#4edeb3] to-[#3bc49c] rounded-full transition-all" style={{ width: `${Math.min(100, pct)}%` }} />
-                      </div>
-                      <div className="flex justify-between text-[10px] font-mono text-[var(--color-text-variant)]">
-                        <span>{formatCompact(g.current_amount)}</span>
-                        <span>{formatCompact(g.target_amount)}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Vadesi Yaklaşan */}
-          {upcomingMaturities.length > 0 && (
-            <div className="bento-card">
-              <h3 className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono mb-4 flex items-center gap-2">
-                <CalendarDays size={14} className="text-[#adc6ff]" /> Yaklaşan Vadeler
-              </h3>
-              <div className="space-y-2.5">
-                {upcomingMaturities.map(acc => {
-                  const remaining = daysUntil(acc.maturity_date!, now);
-                  return (
-                    <div key={acc.id} className="flex items-center justify-between p-3 bg-[var(--color-surface-lowest)] border border-white/5 rounded-xl">
-                      <div>
-                        <p className="text-sm font-bold text-white">{acc.name}</p>
-                        <p className="text-[10px] text-[var(--color-text-variant)] font-mono mt-0.5">
-                          {new Date(acc.maturity_date!).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`text-xs font-bold font-mono ${remaining <= 7 ? 'text-[#ffcf70]' : 'text-[#adc6ff]'}`}>
-                          {remaining} gün
-                        </p>
-                        <p className="text-[10px] text-[#4edeb3] font-mono">+{formatMoney(acc.netInterest)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Son Hareketler */}
           <div className="bento-card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[var(--color-text-variant)] font-bold text-xs uppercase tracking-widest font-mono flex items-center gap-2">
-                <Clock size={14} /> Son Hareketler
-              </h3>
-            </div>
-            {recentTransactions.length > 0 ? (
-              <div className="space-y-2">
-                {recentTransactions.map(t => (
-                  <div key={t.id} className="flex items-center justify-between p-2.5 bg-[var(--color-surface-lowest)] border border-white/5 rounded-xl hover:border-white/10 transition-colors">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                        t.type === 'income' ? 'bg-[#4edeb3]/10 text-[#4edeb3]' : 'bg-[#ff7886]/10 text-[#ff7886]'
-                      }`}>
-                        {t.type === 'income' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-white text-xs truncate">{t.category}</p>
-                        <p className="text-[10px] text-[var(--color-text-variant)] truncate">
-                          {formatDistanceToNow(new Date(t.date), { addSuffix: true, locale: tr })}
-                        </p>
-                      </div>
-                    </div>
-                    <span className={`font-bold font-mono text-xs shrink-0 ml-2 ${
-                      t.type === 'income' ? 'text-[#4edeb3]' : 'text-white'
-                    }`}>
-                      {t.type === 'income' ? '+' : '-'}{formatCompact(t.amount)}
-                    </span>
+            <h3 className="text-xs font-bold uppercase tracking-widest font-mono mb-4">Son İşlemler</h3>
+            <div className="space-y-3">
+              {recentTransactions.map(t => (
+                <div key={t.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold truncate">{t.category}</p>
+                    <p className="text-[9px] opacity-30">{formatDistanceToNow(new Date(t.date), { addSuffix: true, locale: tr })}</p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-[var(--color-text-variant)] gap-2">
-                <Eye size={24} className="opacity-30" />
-                <p className="text-xs">Henüz işlem yok</p>
-              </div>
-            )}
+                  <span className={`text-xs font-bold font-mono ${t.type === 'income' ? 'text-emerald-400' : 'text-white'}`}>
+                    {t.type === 'income' ? '+' : '-'}{formatCompact(t.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          
-          {/* AI Advisor */}
-          <div className="bento-card border border-[var(--color-brand-primary)]/15 bg-gradient-to-b from-[var(--color-brand-primary)]/5 to-transparent">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 rounded-xl bg-[var(--color-brand-primary)]/10 text-[var(--color-brand-primary)] flex items-center justify-center">
-                <Sparkles size={18} />
-              </div>
+
+          <div className="bento-card border border-[var(--color-brand-primary)]/20 bg-gradient-to-br from-[var(--color-brand-primary)]/10 to-transparent">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-[var(--color-brand-primary)]/10 text-[var(--color-brand-primary)] flex items-center justify-center"><Sparkles size={20} /></div>
               <div>
-                <h3 className="font-bold text-white text-sm font-display">AI Danışman</h3>
-                <p className="text-[10px] text-[var(--color-text-variant)]">Kişiselleştirilmiş analiz</p>
+                <h3 className="font-bold text-white text-sm">Finansal Danışman</h3>
+                <p className="text-[10px] opacity-40 uppercase tracking-tighter">AI Destekli Rapor</p>
               </div>
             </div>
             <button 
-              onClick={handleGetAdvice}
+              onClick={handleGetAdvice} 
               disabled={loadingAdvice}
-              className="w-full py-2.5 bg-white/5 hover:bg-[var(--color-brand-primary)] hover:text-black border border-white/10 hover:border-transparent rounded-xl flex items-center justify-center gap-2 font-bold text-sm transition-all"
+              className="w-full py-3 bg-[var(--color-brand-primary)] text-black rounded-2xl font-black text-xs hover:scale-[1.02] active:scale-95 transition-all shadow-lg"
             >
-              {loadingAdvice ? (
-                <><RefreshCcw size={14} className="animate-spin" /> Analiz Ediliyor...</>
-              ) : 'Rapor Çıkart'}
+              {loadingAdvice ? 'ANALİZ YAPILIYOR...' : 'RAPOR OLUŞTUR'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* AI Advice Result */}
-      {advice && (
-        <div className="glass-panel p-6 rounded-3xl relative overflow-hidden border border-[var(--color-brand-primary)]/30 shadow-[0_10px_40px_rgba(78,222,163,0.1)] animate-in fade-in slide-in-from-top-4">
-          <div className="absolute top-0 left-0 w-1.5 h-full bg-[var(--color-brand-primary)]"></div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2 font-display">
-              <Sparkles size={20} className="text-[var(--color-brand-primary)]" /> AI Finansal Öngörü
-            </h3>
-            <button onClick={() => setAdvice(null)} className="text-[var(--color-text-variant)] hover:text-white text-sm font-medium px-3 py-1 rounded-lg hover:bg-white/5 transition-colors">Kapat</button>
+      {isBankModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-md animate-in fade-in duration-300"
+            onClick={() => setIsBankModalOpen(false)}
+          />
+          <div className="relative w-full max-w-[340px] bg-[#1a1c1e] border border-white/10 rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-300">
+            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-black/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[var(--color-brand-primary)]/10 text-[var(--color-brand-primary)] flex items-center justify-center">
+                  <Landmark size={16} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-white font-display">Banka Hesapları</h3>
+                  <p className="text-[8px] text-white/30 uppercase font-bold tracking-widest">Görüntülenecekleri Seçin</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsBankModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-white/5 text-white/20 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-2 max-h-[50vh] overflow-y-auto custom-scrollbar">
+              <button 
+                onClick={() => {
+                  if (selectedBankIds.length === accounts.length) setSelectedBankIds([]);
+                  else setSelectedBankIds(accounts.map(a => a.id));
+                }}
+                className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[8px] font-black uppercase tracking-widest text-[#4edeb3] transition-all mb-1"
+              >
+                {selectedBankIds.length === accounts.length ? 'Tümünü Kaldır' : 'Tümünü Seç'}
+              </button>
+
+              {bankProcessed.map(acc => {
+                const isSelected = selectedBankIds.includes(acc.id);
+                return (
+                  <button 
+                    key={acc.id} 
+                    onClick={() => toggleBankSelection(acc.id)}
+                    className={`w-full flex justify-between items-center p-3 rounded-2xl transition-all border text-left group ${
+                      isSelected 
+                        ? 'bg-white/5 border-white/10 text-white' 
+                        : 'bg-transparent border-white/[0.02] text-white/10 grayscale scale-[0.98]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all ${
+                        isSelected ? 'bg-[#4edeb3] border-[#4edeb3] text-black shadow-[0_0_10px_rgba(78,222,179,0.2)]' : 'bg-transparent border-white/10 text-transparent'
+                      }`}>
+                        <CheckCircle2 size={12} strokeWidth={3} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold group-hover:translate-x-0.5 transition-transform">{acc.name}</p>
+                        <p className="text-[8px] opacity-30 font-bold uppercase">{acc.account_type === 'term_deposit' ? 'Vadeli' : 'Vadesiz'}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs font-black font-mono">{formatMoney(acc.currentValue)}</p>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="p-4 bg-black/10 border-t border-white/5">
+              <button 
+                onClick={() => setIsBankModalOpen(false)}
+                className="w-full py-3 bg-white text-black rounded-xl font-bold text-xs hover:bg-[#4edeb3] transition-all shadow-lg uppercase tracking-tight"
+              >
+                Tamam
+              </button>
+            </div>
           </div>
-          <div className="prose prose-sm prose-invert max-w-none text-[#bbcabf] whitespace-pre-wrap font-sans leading-relaxed">
+        </div>
+      )}
+
+      {advice && (
+        <div className="glass-panel p-8 rounded-[2rem] border border-[var(--color-brand-primary)]/30 shadow-2xl relative overflow-hidden animate-in fade-in zoom-in duration-500">
+           <div className="absolute top-0 right-0 p-4">
+            <X size={20} className="text-white/20 hover:text-white cursor-pointer" onClick={() => setAdvice(null)} />
+          </div>
+          <div className="flex items-center gap-3 mb-6">
+             <Sparkles className="text-[var(--color-brand-primary)]" size={24} />
+             <h3 className="text-xl font-black text-white font-display">AI Strateji Raporu</h3>
+          </div>
+          <div className="prose prose-sm prose-invert max-w-none text-[#bbcabf] font-sans leading-relaxed whitespace-pre-wrap">
             {advice}
           </div>
         </div>

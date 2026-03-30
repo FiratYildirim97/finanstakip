@@ -18,8 +18,8 @@ export const Layout = ({ children }: LayoutProps) => {
 
   const navItems = [
     { to: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { to: '/transactions', icon: <CreditCard size={20} />, label: 'Kart' },
     { to: '/recurring', icon: <CalendarDays size={20} />, label: 'Aylık' },
+    { to: '/transactions', icon: <CreditCard size={20} />, label: 'Kart' },
     { to: '/savings', icon: <PiggyBank size={20} />, label: 'Birikim' },
     { to: '/investments', icon: <TrendingUp size={20} />, label: 'Yatırımlar' },
     { to: '/accounts', icon: <Landmark size={20} />, label: 'Hesaplar' },

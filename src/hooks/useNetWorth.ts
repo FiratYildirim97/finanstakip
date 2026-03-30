@@ -1,13 +1,15 @@
 import { useData } from '../context/DataContext';
 
 export const useNetWorth = () => {
-  const { accounts, investments, netWorthHistory: history, loading, saveTodayNetWorth } = useData();
+  const { accounts, investments, creditCards, netWorthHistory: history, loading, saveTodayNetWorth } = useData();
   const { totalVirtualValue } = useVirtualSavingsInternal();
 
   // Dynamic Calculation of Current Net Worth
   const bankCash = accounts.reduce((acc, a) => acc + a.balance, 0);
   const portfolioValue = investments.reduce((acc, curr) => acc + (curr.quantity * curr.current_price), 0);
-  const currentNetWorth = bankCash + portfolioValue + totalVirtualValue;
+  const cardDebt = creditCards.reduce((acc, c) => acc + (Number(c.current_debt) || 0), 0);
+  
+  const currentNetWorth = bankCash + portfolioValue + totalVirtualValue - cardDebt;
 
   const saveToday = async () => {
     await saveTodayNetWorth(currentNetWorth);

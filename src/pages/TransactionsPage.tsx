@@ -3,6 +3,7 @@ import { useCreditCardExpenses } from '../hooks/useCreditCardExpenses';
 import { useCreditCards } from '../hooks/useCreditCards';
 import { receiptAgent } from '../lib/agents';
 import { CreditCard as CreditCardType } from '../types';
+import { advisorAgent } from '../lib/agents/advisorAgent';
 import {
   Sparkles, Plus, Trash2, CreditCard, Camera, Upload, X,
   ImageIcon, FileText, Store, Tag, Hash, ChevronDown,
@@ -87,6 +88,7 @@ export const TransactionsPage = () => {
   const [merchant, setMerchant] = useState('');
   const [selectedCardId, setSelectedCardId] = useState<string>('');
   const [installments, setInstallments] = useState('1');
+  const [isExempt, setIsExempt] = useState(false);
   const [manualReceiptFile, setManualReceiptFile] = useState<File | null>(null);
 
   // Receipt preview modal
@@ -106,12 +108,31 @@ export const TransactionsPage = () => {
   const [newCardLimit, setNewCardLimit] = useState('');
   const [newCardColor, setNewCardColor] = useState('#a855f7');
 
+  // AI Category Suggestion State
+  const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
+
   // Auto-select first card
   useEffect(() => {
     if (cards.length > 0 && !selectedCardId) {
       setSelectedCardId(cards[0].id);
     }
   }, [cards, selectedCardId]);
+
+  // Auto-categorize based on description
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (description.length >= 3 && inputMode === 'manual') {
+        setIsSuggestingCategory(true);
+        const suggested = await advisorAgent.suggestCategory(description, CREDIT_CARD_CATEGORIES);
+        if (suggested && CREDIT_CARD_CATEGORIES.includes(suggested)) {
+          setCategory(suggested);
+          toast.success(`AI Önerisi: ${suggested}`, { duration: 2000 });
+        }
+        setIsSuggestingCategory(false);
+      }
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [description, inputMode]);
 
   // Sync card totals to recurring
   const handleSyncToRecurring = async () => {
@@ -224,6 +245,7 @@ export const TransactionsPage = () => {
         card_name: selectedCard?.name || null,
         card_id: selectedCard?.id || null,
         installments: numInstallments,
+        is_exempt: false,
         receipt_url: null,
         date: new Date().toISOString().split('T')[0]
       });
@@ -287,6 +309,7 @@ export const TransactionsPage = () => {
       card_name: selectedCard?.name || null,
       card_id: selectedCard?.id || null,
       installments: numInstallments,
+      is_exempt: false,
       receipt_url: receiptUrl,
       date: new Date().toISOString().split('T')[0]
     });
@@ -328,6 +351,7 @@ export const TransactionsPage = () => {
       card_name: selectedCard?.name || null,
       card_id: selectedCard?.id || null,
       installments: parseInt(installments) || 1,
+      is_exempt: isExempt,
       receipt_url: receiptUrl,
       date: new Date().toISOString().split('T')[0]
     });
@@ -338,6 +362,7 @@ export const TransactionsPage = () => {
       setDescription('');
       setMerchant('');
       setInstallments('1');
+      setIsExempt(false);
       setManualReceiptFile(null);
       // Sync this card's total to recurring
       if (selectedCard) {
@@ -368,6 +393,7 @@ export const TransactionsPage = () => {
     : cardFilteredExpenses.filter(e => e.category === selectedFilter);
 
   const filteredTotalExpenses = cardFilteredExpenses.reduce((sum, expense) => {
+    if (expense.is_exempt) return sum;
     if (expense.installments > 1) {
       // Taksitli olunca sadece o aya yansıyan (ilk) taksit tutarını yansıt
       return sum + (expense.amount / expense.installments);
@@ -432,6 +458,7 @@ export const TransactionsPage = () => {
   })();
 
   const expensesBySelectedCardCategory = cardFilteredExpenses.reduce<Record<string, number>>((acc, expense) => {
+    if (expense.is_exempt) return acc;
     const effectiveAmount = expense.installments > 1 ? expense.amount / expense.installments : expense.amount;
     acc[expense.category] = (acc[expense.category] || 0) + effectiveAmount;
     return acc;
@@ -982,22 +1009,22 @@ export const TransactionsPage = () => {
                   </div>
 
                   {/* Category */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                      <Tag size={10} className="inline mr-1" /> Kategori
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={category}
-                        onChange={e => setCategory(e.target.value)}
-                        className="w-full px-4 py-3 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors appearance-none cursor-pointer"
-                      >
-                        {CREDIT_CARD_CATEGORIES.map(cat => (
-                          <option key={cat} value={cat}>{CATEGORY_EMOJIS[cat]} {cat}</option>
-                        ))}
-                      </select>
-                      <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-text-variant)] pointer-events-none" />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest pl-1 flex items-center gap-2">
+                        <Tag size={12} /> Kategori 
+                        {isSuggestingCategory && <Sparkles size={10} className="text-[#4edeb3] animate-pulse" />}
+                      </label>
                     </div>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white focus:outline-none focus:border-[#4edeb3]/50 transition-all appearance-none cursor-pointer"
+                    >
+                      {CREDIT_CARD_CATEGORIES.map(cat => (
+                        <option key={cat} value={cat} className="bg-[#1a1c1e]">{CATEGORY_EMOJIS[cat] || ''} {cat}</option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Merchant */}
@@ -1068,6 +1095,20 @@ export const TransactionsPage = () => {
                       className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors"
                       placeholder="Opsiyonel not..."
                     />
+                  </div>
+
+                  {/* Exempt Toggle */}
+                  <div className="flex items-center justify-between px-4 py-3 bg-[var(--color-surface-lowest)] border border-white/10 rounded-xl">
+                    <label className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">
+                      Muaf (Gider sayılmasın)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsExempt(!isExempt)}
+                      className={`w-10 h-5 rounded-full transition-colors relative ${isExempt ? 'bg-purple-500' : 'bg-white/10'}`}
+                    >
+                      <div className={`absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform ${isExempt ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
                   </div>
 
                   {/* Receipt Upload (Optional) */}
@@ -1169,6 +1210,11 @@ export const TransactionsPage = () => {
                             >
                               <Eye size={14} className="text-cyan-400" />
                             </button>
+                          )}
+                          {expense.is_exempt && (
+                            <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-white/40 text-[7px] font-black uppercase tracking-tighter rounded-full ml-1">
+                              MUAF
+                            </span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-[var(--color-text-variant)] mt-1 font-mono flex-wrap">

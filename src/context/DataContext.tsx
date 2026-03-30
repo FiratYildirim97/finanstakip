@@ -38,6 +38,7 @@ interface DataActions {
   // Transactions
   addTransaction: (t: Partial<Transaction>) => Promise<{ data: any; error: any }>;
   deleteTransaction: (id: string) => Promise<{ error: any }>;
+  updateTransaction: (id: string, u: Partial<Transaction>) => Promise<{ data: any; error: any }>;
 
   // Investments
   addInvestment: (i: Partial<Investment>) => Promise<{ data: any; error: any }>;
@@ -280,21 +281,91 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user, fetchAll]);
 
   // ─── ACTIONS ────────────────────────────────────────────
+  // Bank Accounts
+  const addAccount = useCallback(async (a: Partial<BankAccount>) => {
+    if (!user) return { data: null, error: 'Oturum açık değil' };
+    const { data, error } = await supabase.from('bank_accounts').insert([{ ...a, user_id: user.id }]).select();
+    if (data && data.length > 0) {
+      setState(prev => ({ ...prev, accounts: [data[0] as BankAccount, ...prev.accounts] }));
+    }
+    return { data, error };
+  }, [user]);
+
+  const deleteAccount = useCallback(async (id: string) => {
+    setState(prev => ({ ...prev, accounts: prev.accounts.filter(a => a.id !== id) }));
+    const { error } = await supabase.from('bank_accounts').delete().eq('id', id);
+    return { error };
+  }, []);
+
+  const updateAccount = useCallback(async (id: string, updates: Partial<BankAccount>) => {
+    const { data, error } = await supabase.from('bank_accounts').update(updates).eq('id', id).select();
+    if (data && data.length > 0) {
+      setState(prev => ({ ...prev, accounts: prev.accounts.map(a => a.id === id ? (data[0] as BankAccount) : a) }));
+    }
+    return { data, error };
+  }, []);
+
+  // Helper for balance updates
+  const updateAccountBalance = useCallback(async (accountId: string, amount: number, type: 'income' | 'expense', reverse: boolean = false) => {
+    const account = state.accounts.find(a => a.id === accountId);
+    if (!account) return;
+
+    let adjustment = amount;
+    if (type === 'expense') adjustment = -amount;
+    if (reverse) adjustment = -adjustment;
+
+    const newBalance = (Number(account.balance) || 0) + adjustment;
+    await updateAccount(accountId, { balance: newBalance });
+  }, [state.accounts, updateAccount]);
+
   // Transactions
   const addTransaction = useCallback(async (t: Partial<Transaction>) => {
     if (!user) return { data: null, error: 'Oturum açık değil' };
     const { data, error } = await supabase.from('transactions').insert([{ ...t, user_id: user.id }]).select();
     if (data && data.length > 0) {
-      setState(prev => ({ ...prev, transactions: [data[0] as Transaction, ...prev.transactions] }));
+      const newTx = data[0] as Transaction;
+      setState(prev => ({ ...prev, transactions: [newTx, ...prev.transactions] }));
+      
+      // Update account balance if linked
+      if (newTx.linked_account_id) {
+        await updateAccountBalance(newTx.linked_account_id, newTx.amount, newTx.type);
+      }
     }
     return { data, error };
-  }, [user]);
+  }, [user, updateAccountBalance]);
 
   const deleteTransaction = useCallback(async (id: string) => {
+    const tx = state.transactions.find(t => t.id === id);
+    if (tx && tx.linked_account_id) {
+      await updateAccountBalance(tx.linked_account_id, tx.amount, tx.type, true);
+    }
+
     setState(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
     const { error } = await supabase.from('transactions').delete().eq('id', id);
     return { error };
-  }, []);
+  }, [state.transactions, updateAccountBalance]);
+
+  const updateTransaction = useCallback(async (id: string, updates: Partial<Transaction>) => {
+    const oldTx = state.transactions.find(t => t.id === id);
+    
+    const { data, error } = await supabase.from('transactions').update(updates).eq('id', id).select();
+    if (data && data.length > 0) {
+      const newTx = data[0] as Transaction;
+      
+      // Reverse old impact
+      if (oldTx && oldTx.linked_account_id) {
+        await updateAccountBalance(oldTx.linked_account_id, oldTx.amount, oldTx.type, true);
+      }
+
+      // Apply new impact
+      if (newTx.linked_account_id) {
+        await updateAccountBalance(newTx.linked_account_id, newTx.amount, newTx.type);
+      }
+
+      setState(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === id ? newTx : t) }));
+    }
+    return { data, error };
+  }, [state.transactions, updateAccountBalance]);
 
   // Investments
   const addInvestment = useCallback(async (i: Partial<Investment>) => {
@@ -368,30 +439,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { data, error };
   }, []);
 
-  // Bank Accounts
-  const addAccount = useCallback(async (a: Partial<BankAccount>) => {
-    if (!user) return { data: null, error: 'Oturum açık değil' };
-    const { data, error } = await supabase.from('bank_accounts').insert([{ ...a, user_id: user.id }]).select();
-    if (data && data.length > 0) {
-      setState(prev => ({ ...prev, accounts: [data[0] as BankAccount, ...prev.accounts] }));
-    }
-    return { data, error };
-  }, [user]);
-
-  const deleteAccount = useCallback(async (id: string) => {
-    setState(prev => ({ ...prev, accounts: prev.accounts.filter(a => a.id !== id) }));
-    const { error } = await supabase.from('bank_accounts').delete().eq('id', id);
-    return { error };
-  }, []);
-
-  const updateAccount = useCallback(async (id: string, updates: Partial<BankAccount>) => {
-    const { data, error } = await supabase.from('bank_accounts').update(updates).eq('id', id).select();
-    if (data && data.length > 0) {
-      setState(prev => ({ ...prev, accounts: prev.accounts.map(a => a.id === id ? (data[0] as BankAccount) : a) }));
-    }
-    return { data, error };
-  }, []);
-
   // Credit Cards
   const addCard = useCallback(async (c: Partial<CreditCard>) => {
     if (!user) return { data: null, error: 'Oturum açık değil' };
@@ -416,21 +463,42 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { data, error };
   }, []);
 
+  const updateCardDebt = useCallback(async (cardId: string, amount: number, isAddition: boolean = true) => {
+    const card = state.creditCards.find(c => c.id === cardId);
+    if (!card) return;
+
+    const currentDebt = Number(card.current_debt) || 0;
+    const newDebt = isAddition ? currentDebt + amount : currentDebt - amount;
+    
+    await updateCard(cardId, { current_debt: newDebt });
+  }, [state.creditCards, updateCard]);
+
   // Credit Card Expenses
   const addExpense = useCallback(async (e: Partial<CreditCardExpense>) => {
     if (!user) return { data: null, error: 'Oturum açık değil' };
     const { data, error } = await supabase.from('credit_card_expenses').insert([{ ...e, user_id: user.id }]).select();
     if (data && data.length > 0) {
-      setState(prev => ({ ...prev, creditCardExpenses: [data[0] as CreditCardExpense, ...prev.creditCardExpenses] }));
+      const newExpense = data[0] as CreditCardExpense;
+      setState(prev => ({ ...prev, creditCardExpenses: [newExpense, ...prev.creditCardExpenses] }));
+      
+      // Update card balance
+      if (newExpense.card_id) {
+        await updateCardDebt(newExpense.card_id, newExpense.amount, true);
+      }
     }
     return { data, error };
-  }, [user]);
+  }, [user, updateCardDebt]);
 
   const deleteExpense = useCallback(async (id: string) => {
+    const expense = state.creditCardExpenses.find(e => e.id === id);
+    if (expense && expense.card_id) {
+      await updateCardDebt(expense.card_id, expense.amount, false);
+    }
+
     setState(prev => ({ ...prev, creditCardExpenses: prev.creditCardExpenses.filter(e => e.id !== id) }));
     const { error } = await supabase.from('credit_card_expenses').delete().eq('id', id);
     return { error };
-  }, []);
+  }, [state.creditCardExpenses, updateCardDebt]);
 
   const uploadReceipt = useCallback(async (file: File): Promise<string | null> => {
     if (!user) return null;
@@ -563,7 +631,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ─── CONTEXT VALUE ──────────────────────────────────────
   const value: DataContextType = {
     ...state,
-    addTransaction, deleteTransaction,
+    addTransaction, deleteTransaction, updateTransaction,
     addInvestment, deleteInvestment, updateInvestment, updateInvestmentPrices,
     addRecurring, deleteRecurring, updateRecurring,
     addAccount, deleteAccount, updateAccount,
