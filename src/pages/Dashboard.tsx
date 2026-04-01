@@ -95,24 +95,38 @@ export const Dashboard = () => {
   }, [now]);
 
   // Asset Visibility State
-  const [assetVisibility, setAssetVisibility] = useState({
-    banks: true,
-    investments: true,
-    savings: true,
-    cards: true
+  const [assetVisibility, setAssetVisibility] = useState(() => {
+    const saved = localStorage.getItem('assetVisibility');
+    return saved ? JSON.parse(saved) : {
+      banks: true,
+      investments: true,
+      savings: true,
+      cards: true
+    };
   });
 
-  const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
-  
-  // Initialize selectedBankIds when accounts are loaded
+  // Hidden bank IDs persistence
+  const [hiddenBankIds, setHiddenBankIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem('hiddenBankIds');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Derived selectedBankIds
+  const selectedBankIds = useMemo(() => {
+    return accounts.map(a => a.id).filter(id => !hiddenBankIds.includes(id));
+  }, [accounts, hiddenBankIds]);
+
+  // Persist changes
   useEffect(() => {
-    if (accounts.length > 0 && selectedBankIds.length === 0) {
-      setSelectedBankIds(accounts.map(a => a.id));
-    }
-  }, [accounts]);
+    localStorage.setItem('assetVisibility', JSON.stringify(assetVisibility));
+  }, [assetVisibility]);
+
+  useEffect(() => {
+    localStorage.setItem('hiddenBankIds', JSON.stringify(hiddenBankIds));
+  }, [hiddenBankIds]);
 
   const toggleBankSelection = (id: string) => {
-    setSelectedBankIds(prev => 
+    setHiddenBankIds(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -781,8 +795,8 @@ export const Dashboard = () => {
             <div className="p-4 space-y-2 max-h-[50vh] overflow-y-auto custom-scrollbar">
               <button 
                 onClick={() => {
-                  if (selectedBankIds.length === accounts.length) setSelectedBankIds([]);
-                  else setSelectedBankIds(accounts.map(a => a.id));
+                  if (selectedBankIds.length === accounts.length) setHiddenBankIds(accounts.map(a => a.id));
+                  else setHiddenBankIds([]);
                 }}
                 className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[8px] font-black uppercase tracking-widest text-[#4edeb3] transition-all mb-1"
               >

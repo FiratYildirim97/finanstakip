@@ -365,7 +365,7 @@ export const RecurringTransactionsPage = () => {
       let finished = false;
       let nextOcc = new Date(confirmingRec.next_date);
       
-      if (confirmingRec.frequency === 'monthly') nextOcc.setMonth(nextOcc.setMonth(nextOcc.getMonth() + 1));
+      if (confirmingRec.frequency === 'monthly') nextOcc.setMonth(nextOcc.getMonth() + 1);
       else if (confirmingRec.frequency === 'weekly') nextOcc.setDate(nextOcc.getDate() + 7);
       else if (confirmingRec.frequency === 'yearly') nextOcc.setFullYear(nextOcc.getFullYear() + 1);
       else finished = true;
