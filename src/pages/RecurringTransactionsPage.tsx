@@ -884,9 +884,9 @@ export const RecurringTransactionsPage = () => {
              <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                    <LayoutList size={20} className="text-[var(--color-brand-primary)]" />
-                   Düzenli İşlem Tanımları
+                   Aylık Düzenli İşlem Tanımları
                 </h3>
-                <p className="text-[10px] text-[var(--color-text-variant)] font-mono uppercase tracking-widest">{recurring.length} Kayıtlı Tanım</p>
+                <p className="text-[10px] text-[var(--color-text-variant)] font-mono uppercase tracking-widest">{recurring.filter(r => r.frequency === 'monthly').length} Aylık Tanım</p>
              </div>
 
              <div className="overflow-x-auto">
@@ -901,7 +901,7 @@ export const RecurringTransactionsPage = () => {
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                     {recurring.map(rec => {
+                     {recurring.filter(r => r.frequency === 'monthly').map(rec => {
                         const isEditing = editingRecurringId === rec.id;
                         const freqLabels = { monthly: 'Aylık', weekly: 'Haftalık', yearly: 'Yıllık', once: 'Tek Sefer' };
                         

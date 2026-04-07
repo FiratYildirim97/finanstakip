@@ -2,21 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions';
 import { useGoldDays } from '../hooks/useGoldDays';
 import { useBesPortfolios } from '../hooks/useBesPortfolios';
+import { useLifeInsurance } from '../hooks/useLifeInsurance';
 import { useVirtualSavings } from '../hooks/useVirtualSavings';
-import { ShieldAlert, Trash2, PiggyBank, Sparkles, Plus, Users, Landmark, Banknote } from 'lucide-react';
+import { ShieldAlert, Trash2, PiggyBank, Sparkles, Plus, Users, Landmark, Banknote, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchLivePrices } from '../lib/marketData';
 import { supabase } from '../lib/supabase';
-import { Investment, GoldDay, BesPortfolio } from '../types';
+import { Investment, GoldDay, BesPortfolio, LifeInsurance } from '../types';
 
 export const SavingsPage = () => {
   const { recurring, loading: recurringLoading } = useRecurringTransactions();
   const { goldDays, loading: goldLoading, addGoldDay, deleteGoldDay } = useGoldDays();
   const { bes, loading: besLoading, addBes, updateBes, deleteBes } = useBesPortfolios();
+  const { lifeInsurance, loading: liLoading, addLifeInsurance, deleteLifeInsurance, updateLifeInsurance } = useLifeInsurance();
   const { combinedSavings, totalVirtualValue, loading: virtualLoading } = useVirtualSavings();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'gold' | 'bes'>('general');
+  const [besSubTab, setBesSubTab] = useState<'bes' | 'life'>('bes');
 
   // Gold Form State
   const [goldName, setGoldName] = useState('');
@@ -35,6 +38,22 @@ export const SavingsPage = () => {
   const [besStateRate, setBesStateRate] = useState('30');
   const [besInitialAmount, setBesInitialAmount] = useState('');
   const [isBesSubmitting, setIsBesSubmitting] = useState(false);
+
+  // Life Insurance Form State
+  const [liName, setLiName] = useState('');
+  const [liCompany, setLiCompany] = useState('');
+  const [liMonthly, setLiMonthly] = useState('');
+  const [liCurrency, setLiCurrency] = useState('TRY');
+  const [liStartDate, setLiStartDate] = useState('');
+  const [liPaymentDay, setLiPaymentDay] = useState('1');
+  const [liInitialAmount, setLiInitialAmount] = useState('');
+  const [liMaturityYears, setLiMaturityYears] = useState('10');
+  const [liDescription, setLiDescription] = useState('');
+  const [isLiSubmitting, setIsLiSubmitting] = useState(false);
+
+  // Life Insurance Extra Payment
+  const [liExtraAmount, setLiExtraAmount] = useState('');
+  const [payingLiId, setPayingLiId] = useState<string | null>(null);
 
   // BES One-Time Payment State
   const [extraPaymentAmount, setExtraPaymentAmount] = useState('');
@@ -115,9 +134,51 @@ export const SavingsPage = () => {
       extra_payments_total: b.extra_payments_total + parseFloat(extraPaymentAmount)
     });
     if (!error) {
-      toast.success(`${extraPaymentAmount} ₺ ek ödeme başarıyla BES'e dahil edildi! (Devlet katkısı anında yansıdı)`);
+      toast.success(`${extraPaymentAmount} ₺ ek ödeme başarıyla BES'e dahil edildi!`);
       setExtraPaymentAmount('');
       setPayingBesId(null);
+    }
+  };
+
+  const handleLiSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!liName || !liMonthly || !liStartDate) return;
+    
+    setIsLiSubmitting(true);
+    const { error } = await addLifeInsurance({
+      name: liName,
+      company: liCompany || null,
+      monthly_payment: parseFloat(liMonthly),
+      currency: liCurrency,
+      start_date: liStartDate,
+      payment_day: parseInt(liPaymentDay, 10),
+      initial_amount: liInitialAmount ? parseFloat(liInitialAmount) : 0,
+      extra_payments_total: 0,
+      maturity_years: parseInt(liMaturityYears, 10),
+      description: liDescription || null
+    });
+
+    if (!error) {
+      toast.success('Hayat Sigortası eklendi!');
+      setLiName(''); setLiCompany(''); setLiMonthly(''); setLiCurrency('TRY');
+      setLiStartDate(''); setLiPaymentDay('1'); setLiInitialAmount('');
+      setLiMaturityYears('10'); setLiDescription('');
+    } else {
+      toast.error('Hayat sigortası eklenirken hata oluştu');
+    }
+    setIsLiSubmitting(false);
+    setIsModalOpen(false);
+  };
+
+  const handleLiExtraPayment = async (li: LifeInsurance) => {
+    if (!liExtraAmount) return;
+    const { error } = await updateLifeInsurance(li.id, {
+      extra_payments_total: li.extra_payments_total + parseFloat(liExtraAmount)
+    });
+    if (!error) {
+      toast.success(`Ek ödeme başarıyla hayat sigortasına eklendi!`);
+      setLiExtraAmount('');
+      setPayingLiId(null);
     }
   };
 
@@ -174,9 +235,9 @@ export const SavingsPage = () => {
         {activeTab === 'bes' && (
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="px-6 py-3 bg-[#4edeb3] text-black font-bold rounded-xl flex items-center gap-2 hover:brightness-110 transition-colors"
+            className={`px-6 py-3 ${besSubTab === 'life' ? 'bg-[#a78bfa]' : 'bg-[#4edeb3]'} text-black font-bold rounded-xl flex items-center gap-2 hover:brightness-110 transition-colors`}
           >
-            <Plus size={18} /> BES Planı Ekle
+            <Plus size={18} /> {besSubTab === 'life' ? 'Hayat Sigortası Ekle' : 'BES Planı Ekle'}
           </button>
         )}
       </div>
@@ -206,7 +267,7 @@ export const SavingsPage = () => {
           {[
             { id: 'general', label: 'Genel Birikim' },
             { id: 'gold', label: 'Altın Günü' },
-            { id: 'bes', label: 'B.E.S.' }
+            { id: 'bes', label: 'B.E.S. / Sigorta' }
           ].map(tab => (
               <button 
                 key={tab.id}
@@ -281,7 +342,7 @@ export const SavingsPage = () => {
         </div>
       )}
 
-      {isModalOpen && activeTab === 'bes' && (
+      {isModalOpen && activeTab === 'bes' && besSubTab === 'bes' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" onClick={() => setIsModalOpen(false)}>
           <div 
             className="bg-[var(--color-surface-container)] rounded-3xl w-full max-w-lg border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
@@ -304,7 +365,6 @@ export const SavingsPage = () => {
                     <input type="number" step="0.5" required value={besMonthly} onChange={e => setBesMonthly(e.target.value)} placeholder="Örn: 2000" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#4edeb3] transition-colors" />
                   </div>
                 </div>
-                
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Çekim Günü</label>
@@ -315,7 +375,6 @@ export const SavingsPage = () => {
                     <input type="number" required value={besStateRate} onChange={e => setBesStateRate(e.target.value)} placeholder="Örn: 30" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#4edeb3] transition-colors" />
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">İçerdeki Para(₺)</label>
@@ -326,10 +385,86 @@ export const SavingsPage = () => {
                     <input type="date" required value={besStartDate} onChange={e => setBesStartDate(e.target.value)} className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#4edeb3] transition-colors" />
                   </div>
                 </div>
-                
                 <div className="flex gap-3 pt-4">
                   <button type="submit" disabled={isBesSubmitting} className="flex-1 bg-[#4edeb3] text-black rounded-xl py-3 font-bold hover:brightness-110 transition disabled:opacity-50">
                     Sisteme Bağla
+                  </button>
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 bg-[var(--color-surface-lowest)] text-white rounded-xl border border-white/10 font-bold hover:bg-white/5 transition-colors">
+                    İptal
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Life Insurance Modal */}
+      {isModalOpen && activeTab === 'bes' && besSubTab === 'life' && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" onClick={() => setIsModalOpen(false)}>
+          <div 
+            className="bg-[var(--color-surface-container)] rounded-3xl w-full max-w-lg border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-white/5 bg-[#a78bfa]/10 flex justify-between items-center">
+              <h3 className="font-bold text-[#a78bfa] flex items-center gap-2 text-lg">
+                <Shield size={20} /> Hayat Sigortası Ekle
+              </h3>
+            </div>
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              <form onSubmit={handleLiSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Poliçe Adı <span className="text-red-400">*</span></label>
+                    <input type="text" required value={liName} onChange={e => setLiName(e.target.value)} placeholder="Örn: Anadolu Hayat" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#a78bfa] transition-colors" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Sigorta Şirketi</label>
+                    <input type="text" value={liCompany} onChange={e => setLiCompany(e.target.value)} placeholder="Örn: Allianz" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#a78bfa] transition-colors" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Aylık Ödeme <span className="text-red-400">*</span></label>
+                    <input type="number" step="0.01" required value={liMonthly} onChange={e => setLiMonthly(e.target.value)} placeholder="Örn: 1500" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#a78bfa] transition-colors" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Döviz Türü <span className="text-red-400">*</span></label>
+                    <select value={liCurrency} onChange={e => setLiCurrency(e.target.value)} className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#a78bfa] transition-colors appearance-none">
+                      <option value="TRY">🇹🇷 TRY (₺)</option>
+                      <option value="USD">🇺🇸 USD ($)</option>
+                      <option value="EUR">🇪🇺 EUR (€)</option>
+                      <option value="GBP">🇬🇧 GBP (£)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Çekim Günü</label>
+                    <input type="number" min="1" max="31" value={liPaymentDay} onChange={e => setLiPaymentDay(e.target.value)} placeholder="1" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#a78bfa] transition-colors" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Vade (Yıl)</label>
+                    <input type="number" min="1" max="50" value={liMaturityYears} onChange={e => setLiMaturityYears(e.target.value)} placeholder="10" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#a78bfa] transition-colors" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Mevcut Birikim</label>
+                    <input type="number" step="0.01" value={liInitialAmount} onChange={e => setLiInitialAmount(e.target.value)} placeholder="0" className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#a78bfa] transition-colors" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Başlangıç <span className="text-red-400">*</span></label>
+                    <input type="date" required value={liStartDate} onChange={e => setLiStartDate(e.target.value)} className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#a78bfa] transition-colors" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Açıklama</label>
+                  <input type="text" value={liDescription} onChange={e => setLiDescription(e.target.value)} placeholder="Opsiyonel not..." className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-[#a78bfa] transition-colors" />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button type="submit" disabled={isLiSubmitting} className="flex-1 bg-gradient-to-r from-[#a78bfa] to-[#818cf8] text-white rounded-xl py-3 font-bold hover:brightness-110 transition disabled:opacity-50">
+                    Poliçeyi Kaydet
                   </button>
                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 bg-[var(--color-surface-lowest)] text-white rounded-xl border border-white/10 font-bold hover:bg-white/5 transition-colors">
                     İptal
@@ -508,73 +643,192 @@ export const SavingsPage = () => {
 
         {activeTab === 'bes' && (
             <div className="bento-card overflow-hidden flex flex-col h-full animate-in fade-in zoom-in-95 duration-300">
-                <h3 className="font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-wide font-mono text-sm">
-                  <Landmark size={18} className="text-[#4edeb3]" /> BES Portföylerim
-                </h3>
-                {bes.length === 0 ? (
-                    <div className="p-12 text-center text-[var(--color-text-variant)] flex flex-col items-center gap-3">
-                       <Landmark size={32} className="opacity-50 text-[#4edeb3]" />
-                       <p>Kayıtlı bir Bireysel Emeklilik sözleşmeniz bulunmuyor.</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {bes.map(b => {
-                        const created = new Date(b.start_date);
-                        const today = new Date();
-                        let paidMonths = 0;
-                        let iterDate = new Date(created.getFullYear(), created.getMonth(), b.payment_day || 1);
-                        if (iterDate < created) iterDate.setMonth(iterDate.getMonth() + 1);
-                        while (iterDate <= today) { paidMonths++; iterDate.setMonth(iterDate.getMonth() + 1); }
+                {/* Sub-tab navigation */}
+                <div className="flex gap-2 mb-5">
+                  {[
+                    { id: 'bes' as const, label: 'B.E.S.', icon: <Landmark size={14} />, color: '#4edeb3' },
+                    { id: 'life' as const, label: 'Hayat Sigortası', icon: <Shield size={14} />, color: '#a78bfa' }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setBesSubTab(tab.id)}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                        besSubTab === tab.id
+                          ? 'text-white shadow-lg'
+                          : 'border-transparent text-[var(--color-text-variant)] hover:text-white hover:bg-white/5'
+                      }`}
+                      style={besSubTab === tab.id ? {
+                        backgroundColor: `${tab.color}15`,
+                        borderColor: `${tab.color}30`,
+                        color: tab.color,
+                      } : {}}
+                    >
+                      {tab.icon} {tab.label}
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 font-mono">
+                        {tab.id === 'bes' ? bes.length : lifeInsurance.length}
+                      </span>
+                    </button>
+                  ))}
+                </div>
 
-                        const totalPrincipial = b.initial_amount + (paidMonths * b.monthly_payment) + b.extra_payments_total;
-                        const matchValue = ((paidMonths * b.monthly_payment) + b.extra_payments_total) * (b.state_contribution_rate / 100);
-
-                        return (
-                          <div key={b.id} className="bg-[var(--color-surface-lowest)] rounded-2xl border border-white/5 overflow-hidden">
-                             <div className="px-5 py-4 flex items-center justify-between border-b border-white/5 bg-black/10">
-                               <div className="flex items-center gap-4">
+                {/* BES Content */}
+                {besSubTab === 'bes' && (
+                  <>
+                    {bes.length === 0 ? (
+                      <div className="p-12 text-center text-[var(--color-text-variant)] flex flex-col items-center gap-3">
+                        <Landmark size={32} className="opacity-50 text-[#4edeb3]" />
+                        <p>Kayıtlı bir Bireysel Emeklilik sözleşmeniz bulunmuyor.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {bes.map(b => {
+                          const created = new Date(b.start_date);
+                          const today = new Date();
+                          let paidMonths = 0;
+                          let iterDate = new Date(created.getFullYear(), created.getMonth(), b.payment_day || 1);
+                          if (iterDate < created) iterDate.setMonth(iterDate.getMonth() + 1);
+                          while (iterDate <= today) { paidMonths++; iterDate.setMonth(iterDate.getMonth() + 1); }
+                          const totalPrincipial = b.initial_amount + (paidMonths * b.monthly_payment) + b.extra_payments_total;
+                          const matchValue = ((paidMonths * b.monthly_payment) + b.extra_payments_total) * (b.state_contribution_rate / 100);
+                          return (
+                            <div key={b.id} className="bg-[var(--color-surface-lowest)] rounded-2xl border border-white/5 overflow-hidden">
+                              <div className="px-5 py-4 flex items-center justify-between border-b border-white/5 bg-black/10">
+                                <div className="flex items-center gap-4">
                                   <div className="bg-[#4edeb3]/10 p-3 rounded-xl border border-[#4edeb3]/20">
-                                     <Landmark size={20} className="text-[#4edeb3]" />
+                                    <Landmark size={20} className="text-[#4edeb3]" />
                                   </div>
                                   <div>
                                     <span className="font-bold text-white font-display text-base">{b.name}</span>
                                     <p className="text-xs text-[var(--color-text-variant)] mt-1 font-mono">Her ayın {b.payment_day || 1}. Günü / {b.monthly_payment.toLocaleString('tr-TR')} ₺</p>
                                   </div>
-                               </div>
-                               <button onClick={() => deleteBes(b.id)} className="text-[#ff7886] opacity-50 hover:opacity-100 hover:bg-[#ff7886]/10 p-2.5 rounded-xl transition" title="Sil"><Trash2 size={18} /></button>
-                             </div>
-                             
-                             <div className="p-5 flex flex-col gap-4">
+                                </div>
+                                <button onClick={() => deleteBes(b.id)} className="text-[#ff7886] opacity-50 hover:opacity-100 hover:bg-[#ff7886]/10 p-2.5 rounded-xl transition" title="Sil"><Trash2 size={18} /></button>
+                              </div>
+                              <div className="p-5 flex flex-col gap-4">
                                 <div className="flex justify-between items-center text-sm border-b border-white/5 pb-3">
-                                  <span className="text-[var(--color-text-variant)]">Ana Para Birikimi <span className="text-[10px] opacity-50"></span></span>
+                                  <span className="text-[var(--color-text-variant)]">Ana Para Birikimi</span>
                                   <span className="text-white font-bold font-mono text-lg">{totalPrincipial.toLocaleString('tr-TR')} ₺</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm border-b border-white/5 pb-3">
                                   <span className="text-[var(--color-text-variant)]">Devlet Katkısı <span className="text-[#4edeb3]/50 text-[10px] border border-[#4edeb3]/20 px-1 py-0.5 rounded">% {b.state_contribution_rate}</span></span>
                                   <span className="text-[#4edeb3] font-bold font-mono text-lg">+{matchValue.toLocaleString('tr-TR')} ₺</span>
                                 </div>
-
                                 <div className="flex justify-between items-center text-base pt-1">
                                   <span className="text-[var(--color-text-variant)] uppercase tracking-wider text-[10px] font-bold">Toplam Fon Büyüklüğü</span>
                                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4edeb3] to-[#3bc49c] font-black font-mono text-xl">{(totalPrincipial + matchValue).toLocaleString('tr-TR')} ₺</span>
                                 </div>
-                                
                                 {payingBesId === b.id ? (
-                                   <div className="flex items-center gap-2 animate-in slide-in-from-top-1 bg-black/30 p-2 rounded-xl border border-[#4edeb3]/20 mt-2">
-                                      <input type="number" required value={extraPaymentAmount} onChange={e => setExtraPaymentAmount(e.target.value)} placeholder="Tutar (₺)" className="w-full px-4 py-2 text-sm bg-black/50 text-white rounded-lg outline-none focus:border-[#4edeb3] border border-white/5 transition-colors" />
-                                      <button onClick={() => handleBesExtraPayment(b)} className="px-5 py-2 text-sm bg-[#4edeb3] hover:brightness-110 transition text-black font-bold rounded-lg shrink-0">Bakiye Ekle</button>
-                                      <button onClick={() => setPayingBesId(null)} className="px-4 py-2 text-sm bg-white/5 hover:bg-white/10 text-white rounded-lg shrink-0 transition">İptal</button>
-                                   </div>
+                                  <div className="flex items-center gap-2 animate-in slide-in-from-top-1 bg-black/30 p-2 rounded-xl border border-[#4edeb3]/20 mt-2">
+                                    <input type="number" required value={extraPaymentAmount} onChange={e => setExtraPaymentAmount(e.target.value)} placeholder="Tutar (₺)" className="w-full px-4 py-2 text-sm bg-black/50 text-white rounded-lg outline-none focus:border-[#4edeb3] border border-white/5 transition-colors" />
+                                    <button onClick={() => handleBesExtraPayment(b)} className="px-5 py-2 text-sm bg-[#4edeb3] hover:brightness-110 transition text-black font-bold rounded-lg shrink-0">Bakiye Ekle</button>
+                                    <button onClick={() => setPayingBesId(null)} className="px-4 py-2 text-sm bg-white/5 hover:bg-white/10 text-white rounded-lg shrink-0 transition">İptal</button>
+                                  </div>
                                 ) : (
-                                   <button onClick={() => { setPayingBesId(b.id); setExtraPaymentAmount(''); }} className="mt-2 flex items-center justify-center gap-2 text-xs uppercase font-bold tracking-wider text-black bg-[#4edeb3] hover:brightness-110 w-full py-3 rounded-xl transition shadow-lg shadow-[#4edeb3]/10">
-                                      <Plus size={16} /> Tek Seferlik Ek Para
-                                   </button>
+                                  <button onClick={() => { setPayingBesId(b.id); setExtraPaymentAmount(''); }} className="mt-2 flex items-center justify-center gap-2 text-xs uppercase font-bold tracking-wider text-black bg-[#4edeb3] hover:brightness-110 w-full py-3 rounded-xl transition shadow-lg shadow-[#4edeb3]/10">
+                                    <Plus size={16} /> Tek Seferlik Ek Para
+                                  </button>
                                 )}
-                             </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Life Insurance Content */}
+                {besSubTab === 'life' && (
+                  <>
+                    {lifeInsurance.length === 0 ? (
+                      <div className="p-12 text-center text-[var(--color-text-variant)] flex flex-col items-center gap-3">
+                        <Shield size={32} className="opacity-50 text-[#a78bfa]" />
+                        <p>Kayıtlı bir hayat sigortası poliçeniz bulunmuyor.</p>
+                        <p className="text-xs opacity-60">Yukarıdaki "Hayat Sigortası Ekle" butonuyla yeni poliçe ekleyebilirsiniz.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {lifeInsurance.map(li => {
+                          const created = new Date(li.start_date);
+                          const today = new Date();
+                          let paidMonths = 0;
+                          // BES ile aynı mantık: ilk ödeme gününü bul, geçmiş ayları say
+                          let iterDate = new Date(created.getFullYear(), created.getMonth(), li.payment_day || 1);
+                          if (iterDate < created) iterDate.setMonth(iterDate.getMonth() + 1);
+                          while (iterDate <= today) { paidMonths++; iterDate.setMonth(iterDate.getMonth() + 1); }
+                          // Bu ayki ödeme günü henüz gelmemişse bir azalt
+                          const thisMonthPayDay = new Date(today.getFullYear(), today.getMonth(), li.payment_day || 1);
+                          if (today < thisMonthPayDay) paidMonths = Math.max(0, paidMonths - 1);
+
+                          const totalPaid = li.initial_amount + (paidMonths * li.monthly_payment) + li.extra_payments_total;
+                          const totalMaturityMonths = li.maturity_years * 12;
+                          const progressPercent = Math.min((paidMonths / totalMaturityMonths) * 100, 100);
+                          const currencySymbol = li.currency === 'TRY' ? '₺' : li.currency === 'USD' ? '$' : li.currency === 'EUR' ? '€' : '£';
+                          const currencyFlag = li.currency === 'TRY' ? '🇹🇷' : li.currency === 'USD' ? '🇺🇸' : li.currency === 'EUR' ? '🇪🇺' : '🇬🇧';
+
+                          return (
+                            <div key={li.id} className="bg-[var(--color-surface-lowest)] rounded-2xl border border-white/5 overflow-hidden">
+                              <div className="px-5 py-4 flex items-center justify-between border-b border-white/5 bg-black/10">
+                                <div className="flex items-center gap-4">
+                                  <div className="bg-[#a78bfa]/10 p-3 rounded-xl border border-[#a78bfa]/20">
+                                    <Shield size={20} className="text-[#a78bfa]" />
+                                  </div>
+                                  <div>
+                                    <span className="font-bold text-white font-display text-base">{li.name}</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      {li.company && <span className="text-xs text-[var(--color-text-variant)]">{li.company}</span>}
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#a78bfa]/10 text-[#a78bfa] border border-[#a78bfa]/20 font-bold">
+                                        {currencyFlag} {li.currency}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <button onClick={() => deleteLifeInsurance(li.id)} className="text-[#ff7886] opacity-50 hover:opacity-100 hover:bg-[#ff7886]/10 p-2.5 rounded-xl transition" title="Sil"><Trash2 size={18} /></button>
+                              </div>
+                              <div className="p-5 flex flex-col gap-4">
+                                <div className="flex justify-between items-center text-sm border-b border-white/5 pb-3">
+                                  <span className="text-[var(--color-text-variant)]">Aylık Ödeme</span>
+                                  <span className="text-white font-bold font-mono">{li.monthly_payment.toLocaleString('tr-TR')} {currencySymbol}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm border-b border-white/5 pb-3">
+                                  <span className="text-[var(--color-text-variant)]">Ödenen Ay</span>
+                                  <span className="text-white font-bold font-mono">{paidMonths} <span className="text-[var(--color-text-variant)] text-xs">/ {totalMaturityMonths} ay</span></span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm border-b border-white/5 pb-3">
+                                  <span className="text-[var(--color-text-variant)]">Toplam Birikim</span>
+                                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#a78bfa] to-[#818cf8] font-black font-mono text-xl">{totalPaid.toLocaleString('tr-TR')} {currencySymbol}</span>
+                                </div>
+                                {/* Progress bar */}
+                                <div>
+                                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                                    <div className="h-full rounded-full bg-gradient-to-r from-[#a78bfa] to-[#818cf8] transition-all" style={{ width: `${progressPercent}%` }} />
+                                  </div>
+                                  <div className="flex justify-between mt-1.5 text-[10px] text-[var(--color-text-variant)] font-mono">
+                                    <span>{paidMonths} ay ödendi</span>
+                                    <span>Vade: {li.maturity_years} yıl</span>
+                                  </div>
+                                </div>
+                                {li.description && (
+                                  <p className="text-xs text-[var(--color-text-variant)] italic bg-white/[0.02] p-2 rounded-lg border border-white/5">📝 {li.description}</p>
+                                )}
+                                {payingLiId === li.id ? (
+                                  <div className="flex items-center gap-2 animate-in slide-in-from-top-1 bg-black/30 p-2 rounded-xl border border-[#a78bfa]/20 mt-2">
+                                    <input type="number" required value={liExtraAmount} onChange={e => setLiExtraAmount(e.target.value)} placeholder={`Tutar (${currencySymbol})`} className="w-full px-4 py-2 text-sm bg-black/50 text-white rounded-lg outline-none focus:border-[#a78bfa] border border-white/5 transition-colors" />
+                                    <button onClick={() => handleLiExtraPayment(li)} className="px-5 py-2 text-sm bg-gradient-to-r from-[#a78bfa] to-[#818cf8] hover:brightness-110 transition text-white font-bold rounded-lg shrink-0">Ekle</button>
+                                    <button onClick={() => setPayingLiId(null)} className="px-4 py-2 text-sm bg-white/5 hover:bg-white/10 text-white rounded-lg shrink-0 transition">İptal</button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => { setPayingLiId(li.id); setLiExtraAmount(''); }} className="mt-2 flex items-center justify-center gap-2 text-xs uppercase font-bold tracking-wider text-white bg-gradient-to-r from-[#a78bfa] to-[#818cf8] hover:brightness-110 w-full py-3 rounded-xl transition shadow-lg shadow-[#a78bfa]/10">
+                                    <Plus size={16} /> Ek Ödeme Yap
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
                 )}
             </div>
         )}

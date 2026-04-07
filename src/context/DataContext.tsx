@@ -9,8 +9,10 @@ import type {
   BankAccount,
   CreditCard,
   CreditCardExpense,
+  CardInstallment,
   GoldDay,
   BesPortfolio,
+  LifeInsurance,
   Goal,
   Budget,
 } from '../types';
@@ -24,8 +26,10 @@ interface DataState {
   accounts: BankAccount[];
   creditCards: CreditCard[];
   creditCardExpenses: CreditCardExpense[];
+  cardInstallments: CardInstallment[];
   goldDays: GoldDay[];
   besPortfolios: BesPortfolio[];
+  lifeInsurance: LifeInsurance[];
   goals: Goal[];
   budgets: Budget[];
   loading: boolean;
@@ -66,6 +70,10 @@ interface DataActions {
   deleteExpense: (id: string) => Promise<{ error: any }>;
   uploadReceipt: (file: File) => Promise<string | null>;
 
+  // Card Installments
+  addCardInstallment: (i: Partial<CardInstallment>) => Promise<{ data: any; error: any }>;
+  deleteCardInstallment: (id: string) => Promise<{ error: any }>;
+
   // Gold Days
   addGoldDay: (g: Partial<GoldDay>) => Promise<{ data: any; error: any }>;
   deleteGoldDay: (id: string) => Promise<{ error: any }>;
@@ -74,6 +82,11 @@ interface DataActions {
   addBes: (b: Partial<BesPortfolio>) => Promise<{ data: any; error: any }>;
   deleteBes: (id: string) => Promise<{ error: any }>;
   updateBes: (id: string, u: Partial<BesPortfolio>) => Promise<{ data: any; error: any }>;
+
+  // Life Insurance
+  addLifeInsurance: (l: Partial<LifeInsurance>) => Promise<{ data: any; error: any }>;
+  deleteLifeInsurance: (id: string) => Promise<{ error: any }>;
+  updateLifeInsurance: (id: string, u: Partial<LifeInsurance>) => Promise<{ data: any; error: any }>;
 
   // Goals & Budgets
   addGoal: (g: Partial<Goal>) => Promise<any>;
@@ -112,8 +125,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     accounts: [],
     creditCards: [],
     creditCardExpenses: [],
+    cardInstallments: [],
     goldDays: [],
     besPortfolios: [],
+    lifeInsurance: [],
     goals: [],
     budgets: [],
     loading: true,
@@ -137,8 +152,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       accRes,
       ccRes,
       cceRes,
+      ciRes,
       gdRes,
       besRes,
+      liRes,
       goalRes,
       budgetRes,
     ] = await Promise.all([
@@ -149,8 +166,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       supabase.from('bank_accounts').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('credit_cards').select('*').eq('user_id', uid).order('name', { ascending: true }),
       supabase.from('credit_card_expenses').select('*').eq('user_id', uid).order('date', { ascending: false }),
+      supabase.from('card_installments').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('gold_days').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('bes_portfolios').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('life_insurance').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
       supabase.from('goals').select('*').eq('user_id', uid),
       supabase.from('budgets').select('*').eq('user_id', uid),
     ]);
@@ -165,8 +184,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       accounts: (accRes.data as BankAccount[]) || [],
       creditCards: (ccRes.data as CreditCard[]) || [],
       creditCardExpenses: (cceRes.data as CreditCardExpense[]) || [],
+      cardInstallments: (ciRes.data as CardInstallment[]) || [],
       goldDays: (gdRes.data as GoldDay[]) || [],
       besPortfolios: (besRes.data as BesPortfolio[]) || [],
+      lifeInsurance: (liRes.data as LifeInsurance[]) || [],
       goals: (goalRes.data as Goal[]) || [],
       budgets: (budgetRes.data as Budget[]) || [],
       loading: false,
@@ -187,8 +208,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         accounts: [],
         creditCards: [],
         creditCardExpenses: [],
+        cardInstallments: [],
         goldDays: [],
         besPortfolios: [],
+        lifeInsurance: [],
         goals: [],
         budgets: [],
         loading: false,
@@ -269,6 +292,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (payload.eventType === 'INSERT') return { ...prev, besPortfolios: [payload.new as BesPortfolio, ...prev.besPortfolios] };
           if (payload.eventType === 'DELETE') return { ...prev, besPortfolios: prev.besPortfolios.filter(b => b.id !== payload.old.id) };
           if (payload.eventType === 'UPDATE') return { ...prev, besPortfolios: prev.besPortfolios.map(b => b.id === payload.new.id ? payload.new as BesPortfolio : b) };
+          return prev;
+        });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'life_insurance', filter: `user_id=eq.${user.id}` }, (payload) => {
+        setState(prev => {
+          if (payload.eventType === 'INSERT') return { ...prev, lifeInsurance: [payload.new as LifeInsurance, ...prev.lifeInsurance] };
+          if (payload.eventType === 'DELETE') return { ...prev, lifeInsurance: prev.lifeInsurance.filter(l => l.id !== payload.old.id) };
+          if (payload.eventType === 'UPDATE') return { ...prev, lifeInsurance: prev.lifeInsurance.map(l => l.id === payload.new.id ? payload.new as LifeInsurance : l) };
           return prev;
         });
       })
@@ -510,6 +541,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return urlData.publicUrl;
   }, [user]);
 
+  // Card Installments (standalone tracker — does NOT sync to recurring)
+  const addCardInstallment = useCallback(async (i: Partial<CardInstallment>) => {
+    if (!user) return { data: null, error: 'Oturum açık değil' };
+    const { data, error } = await supabase.from('card_installments').insert([{ ...i, user_id: user.id }]).select();
+    if (data && data.length > 0) {
+      setState(prev => ({ ...prev, cardInstallments: [data[0] as CardInstallment, ...prev.cardInstallments] }));
+    }
+    return { data, error };
+  }, [user]);
+
+  const deleteCardInstallment = useCallback(async (id: string) => {
+    setState(prev => ({ ...prev, cardInstallments: prev.cardInstallments.filter(ci => ci.id !== id) }));
+    const { error } = await supabase.from('card_installments').delete().eq('id', id);
+    return { error };
+  }, []);
+
   // Gold Days
   const addGoldDay = useCallback(async (g: Partial<GoldDay>) => {
     if (!user) return { data: null, error: 'Oturum açık değil' };
@@ -568,6 +615,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data, error } = await supabase.from('bes_portfolios').update(updates).eq('id', id).select();
     if (data && data.length > 0) {
       setState(prev => ({ ...prev, besPortfolios: prev.besPortfolios.map(b => b.id === id ? (data[0] as BesPortfolio) : b) }));
+    }
+    return { data, error };
+  }, []);
+
+  // Life Insurance
+  const addLifeInsurance = useCallback(async (l: Partial<LifeInsurance>) => {
+    if (!user) return { data: null, error: 'Oturum açık değil' };
+    const { data: liData, error: liError } = await supabase.from('life_insurance').insert([{ ...l, user_id: user.id }]).select();
+    if (liData && liData.length > 0) {
+      const newLI = liData[0] as LifeInsurance;
+      setState(prev => ({ ...prev, lifeInsurance: [newLI, ...prev.lifeInsurance] }));
+    }
+    return { data: liData, error: liError };
+  }, [user]);
+
+  const deleteLifeInsurance = useCallback(async (id: string) => {
+    setState(prev => ({ ...prev, lifeInsurance: prev.lifeInsurance.filter(l => l.id !== id) }));
+    const { error } = await supabase.from('life_insurance').delete().eq('id', id);
+    return { error };
+  }, []);
+
+  const updateLifeInsurance = useCallback(async (id: string, updates: Partial<LifeInsurance>) => {
+    const { data, error } = await supabase.from('life_insurance').update(updates).eq('id', id).select();
+    if (data && data.length > 0) {
+      setState(prev => ({ ...prev, lifeInsurance: prev.lifeInsurance.map(l => l.id === id ? (data[0] as LifeInsurance) : l) }));
     }
     return { data, error };
   }, []);
@@ -637,8 +709,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addAccount, deleteAccount, updateAccount,
     addCard, deleteCard, updateCard,
     addExpense, deleteExpense, uploadReceipt,
+    addCardInstallment, deleteCardInstallment,
     addGoldDay, deleteGoldDay,
     addBes, deleteBes, updateBes,
+    addLifeInsurance, deleteLifeInsurance, updateLifeInsurance,
     addGoal, updateGoalProgress, addBudget, deleteGoal, deleteBudget,
     saveTodayNetWorth,
     refetch: fetchAll,

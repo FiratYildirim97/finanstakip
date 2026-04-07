@@ -132,6 +132,35 @@ export interface BesPortfolio {
   created_at: string;
 }
 
+export interface LifeInsurance {
+  id: string;
+  user_id: string;
+  name: string;
+  company: string | null;
+  monthly_payment: number;
+  currency: string;
+  start_date: string;
+  payment_day: number;
+  initial_amount: number;
+  extra_payments_total: number;
+  maturity_years: number;
+  description: string | null;
+  created_at: string;
+}
+
+export interface CardInstallment {
+  id: string;
+  user_id: string;
+  card_id: string;
+  name: string;
+  total_amount: number;
+  installment_count: number;
+  start_date: string;
+  category: string;
+  description: string | null;
+  created_at: string;
+}
+
 export interface CreditCardExpense {
   id: string;
   user_id: string;

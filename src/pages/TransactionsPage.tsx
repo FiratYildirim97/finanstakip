@@ -1,6 +1,7 @@
 import React, { useState, useEffect, FormEvent, useRef, useCallback, useMemo } from 'react';
 import { useCreditCardExpenses } from '../hooks/useCreditCardExpenses';
 import { useCreditCards } from '../hooks/useCreditCards';
+import { useCardInstallments } from '../hooks/useCardInstallments';
 import { receiptAgent } from '../lib/agents';
 import { CreditCard as CreditCardType } from '../types';
 import { advisorAgent } from '../lib/agents/advisorAgent';
@@ -9,7 +10,7 @@ import {
   ImageIcon, FileText, Store, Tag, Hash, ChevronDown,
   Receipt, Eye, Loader2, CheckCircle2, AlertCircle,
   PlusCircle, Settings, Wallet, Calendar, List,
-  Clock, ArrowRight
+  Clock, ArrowRight, Shield
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -1261,17 +1262,19 @@ export const TransactionsPage = () => {
         </div>
       </div>
 
-      {/* Taksitler Bolumu (Inline Installments Section) */}
+      {/* Taksit Yönetici (Enhanced Installments Section) */}
       <div className="glass-panel p-6 sm:p-8 rounded-3xl space-y-6 mt-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2.5 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/20">
-            <List size={22} className="text-purple-400" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white">Gelecek Taksitler</h2>
-            <p className="text-xs text-[var(--color-text-variant)]">
-              {installmentExpenses.length} aktif taksitli işlemin aylık dağılımı
-            </p>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/20">
+              <List size={22} className="text-purple-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Taksit Yönetici</h2>
+              <p className="text-xs text-[var(--color-text-variant)]">
+                {installmentExpenses.length} aktif taksitli işleminiz var
+              </p>
+            </div>
           </div>
         </div>
 
@@ -1289,28 +1292,104 @@ export const TransactionsPage = () => {
           </div>
         ) : (
           <>
+            {/* Current Month Installment Summary */}
             {(() => {
               const totalInstallmentAmount = installmentExpenses.reduce((sum, e) => sum + e.amount, 0);
               const monthlyInstallmentAmount = installmentExpenses.reduce((sum, e) => sum + (e.amount / e.installments), 0);
+              const now = new Date();
+              const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+              const currentMonthData = futureMonthlyInstallments.find(m => m.key === currentMonthKey);
+              const currentMonthTotal = currentMonthData?.total || 0;
+              const currentMonthItems = currentMonthData?.items || [];
+              
               return (
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="p-4 rounded-2xl bg-purple-500/5 border border-purple-500/10 flex flex-col justify-center">
-                    <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Toplam Taksitli Tutar</p>
-                    <p className="text-2xl font-black text-white font-mono mt-1">
-                      {new Intl.NumberFormat('tr-TR').format(totalInstallmentAmount)} <span className="text-purple-400 text-base">₺</span>
-                    </p>
+                <div className="space-y-4">
+                  {/* Stats Row */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-4 rounded-2xl bg-purple-500/5 border border-purple-500/10 flex flex-col justify-center">
+                      <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Toplam Taksitli</p>
+                      <p className="text-xl font-black text-white font-mono mt-1">
+                        {new Intl.NumberFormat('tr-TR').format(totalInstallmentAmount)} <span className="text-purple-400 text-sm">₺</span>
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-pink-500/5 border border-pink-500/10 flex flex-col justify-center">
+                      <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Aylık Yük</p>
+                      <p className="text-xl font-black text-white font-mono mt-1">
+                        {new Intl.NumberFormat('tr-TR').format(monthlyInstallmentAmount)} <span className="text-pink-400 text-sm">₺</span>
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex flex-col justify-center">
+                      <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Bu Ay Taksit</p>
+                      <p className="text-xl font-black text-white font-mono mt-1">
+                        {new Intl.NumberFormat('tr-TR').format(currentMonthTotal)} <span className="text-amber-400 text-sm">₺</span>
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-[var(--color-brand-primary)]/5 border border-[var(--color-brand-primary)]/10 flex flex-col justify-center">
+                      <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Aktif İşlem</p>
+                      <p className="text-xl font-black text-white font-mono mt-1">
+                        {installmentExpenses.filter(e => {
+                          const d = new Date(e.date);
+                          const mp = Math.max(1, (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth()) + 1);
+                          return mp < e.installments;
+                        }).length} <span className="text-[var(--color-brand-primary)] text-sm">adet</span>
+                      </p>
+                    </div>
                   </div>
-                  <div className="p-4 rounded-2xl bg-pink-500/5 border border-pink-500/10 flex flex-col justify-center">
-                    <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Aylık Taksit Toplamı</p>
-                    <p className="text-2xl font-black text-white font-mono mt-1">
-                      {new Intl.NumberFormat('tr-TR').format(monthlyInstallmentAmount)} <span className="text-pink-400 text-base">₺</span>
-                    </p>
-                  </div>
+
+                  {/* This Month Quick Actions */}
+                  {currentMonthItems.length > 0 && (
+                    <div className="bg-gradient-to-r from-amber-500/5 to-orange-500/5 rounded-2xl border border-amber-500/15 p-5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Clock size={16} className="text-amber-400" />
+                          <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                            Bu Ay Ödenecek Taksitler
+                          </h3>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold font-mono border border-amber-500/20">
+                            {currentMonthItems.length} işlem
+                          </span>
+                        </div>
+                        <span className="text-lg font-black text-amber-400 font-mono">
+                          {new Intl.NumberFormat('tr-TR').format(currentMonthTotal)} ₺
+                        </span>
+                      </div>
+
+                      <div className="space-y-2">
+                        {currentMonthItems.map((item: any) => (
+                          <div key={`curr-${item.id}`} className="flex items-center justify-between p-3 rounded-xl bg-black/20 border border-white/5 hover:border-amber-500/20 transition-all group">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">{CATEGORY_EMOJIS[item.category] || '📦'}</span>
+                              <div>
+                                <p className="text-sm font-bold text-white">{item.merchant || item.category}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/10">
+                                    {item.currentInstallmentNumber}/{item.installments}
+                                  </span>
+                                  {item.card_name && (
+                                    <span className="text-[10px] text-[var(--color-text-variant)] flex items-center gap-1 font-mono">
+                                      <CreditCard size={8} /> {item.card_name}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <span className="font-mono font-black text-white">
+                              {new Intl.NumberFormat('tr-TR').format(item.monthlyAmount)} <span className="text-xs text-amber-400">₺</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
 
-            <div className="space-y-4">
+            {/* All Installments List */}
+            <div className="space-y-4 mt-6">
+              <h3 className="text-xs font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono flex items-center gap-2">
+                <List size={14} /> Tüm Taksitli İşlemler
+              </h3>
               {Object.entries(installmentGroups).map(([groupKey, group]: [string, any]) => (
                 <div key={groupKey} className="space-y-3">
                   <div className="flex items-center gap-2 px-1">
@@ -1320,7 +1399,7 @@ export const TransactionsPage = () => {
                       ({group.items.length} işlem)
                     </span>
                   </div>
-                  {group.items.map((expense) => {
+                  {group.items.map((expense: any) => {
                     const monthlyAmount = expense.amount / expense.installments;
                     const expenseDate = new Date(expense.date);
                     const now = new Date();
