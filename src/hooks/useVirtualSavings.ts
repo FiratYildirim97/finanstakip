@@ -4,7 +4,7 @@ import { useData } from '../context/DataContext';
 import { fetchLivePrices } from '../lib/marketData';
 
 export const useVirtualSavings = () => {
-  const { recurring, goldDays, besPortfolios: bes, loading: dataLoading } = useData();
+  const { recurring, goldDays, besPortfolios: bes, lifeInsurance, loading: dataLoading } = useData();
 
   const [combinedSavings, setCombinedSavings] = useState<Investment[]>([]);
   const [totalVirtualValue, setTotalVirtualValue] = useState(0);
@@ -101,7 +101,32 @@ export const useVirtualSavings = () => {
       } as Investment;
     });
 
-    const combined = [...virtualSavings, ...virtualGoldDays, ...virtualBes];
+    const virtualLife = lifeInsurance.map(li => {
+      const created = new Date(li.start_date);
+      let paidMonths = 0;
+      let iterDate = new Date(created.getFullYear(), created.getMonth(), li.payment_day || 1);
+      if (iterDate < created) iterDate.setMonth(iterDate.getMonth() + 1);
+      while (iterDate <= today) {
+        paidMonths++;
+        iterDate.setMonth(iterDate.getMonth() + 1);
+      }
+      
+      const totalAccumulated = li.initial_amount + (paidMonths * li.monthly_payment) + li.extra_payments_total;
+      
+      return {
+        id: li.id,
+        user_id: li.user_id,
+        asset_type: 'currency',
+        name: li.name,
+        symbol: li.currency,
+        quantity: totalAccumulated,
+        avg_price: 1,
+        current_price: 1,
+        created_at: li.created_at
+      } as Investment;
+    });
+
+    const combined = [...virtualSavings, ...virtualGoldDays, ...virtualBes, ...virtualLife];
 
     if (combined.length > 0) {
       fetchLivePrices(combined).then(prices => {
@@ -126,7 +151,7 @@ export const useVirtualSavings = () => {
       setTotalVirtualValue(0);
       setLoading(false);
     }
-  }, [recurring, goldDays, bes, dataLoading]);
+  }, [recurring, goldDays, bes, lifeInsurance, dataLoading]);
 
   return { combinedSavings, totalVirtualValue, loading };
 };

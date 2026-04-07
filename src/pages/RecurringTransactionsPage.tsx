@@ -101,6 +101,7 @@ export const RecurringTransactionsPage = () => {
 
   // Edit states for definitions (Master List)
   const [showManageList, setShowManageList] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
   const [editRecAmount, setEditRecAmount] = useState('');
   const [editRecCategory, setEditRecCategory] = useState('');
@@ -550,116 +551,23 @@ export const RecurringTransactionsPage = () => {
 
          <div className="p-6">
             {activeTab === 'plan' ? (
-               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Form Column */}
-                  <div className="lg:col-span-1">
-                     <div className="p-5 bg-white/[0.02] rounded-2xl border border-white/5 space-y-5">
-                        <div className="flex p-1 bg-black/20 rounded-xl mb-4">
-                           <button onClick={() => setType('income')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${type === 'income' ? 'bg-[#4edeb3] text-[#002113]' : 'text-white/40'}`}>GELİR</button>
-                           <button onClick={() => setType('expense')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${type === 'expense' ? 'bg-[#ffb4ab] text-[#002113]' : 'text-white/40'}`}>GİDER</button>
-                        </div>
-                        
-                        <form onSubmit={handleManualSubmit} className="space-y-4">
-                           <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                 <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Miktar</label>
-                                 <input type="number" step="0.01" required value={amount} onChange={e => setAmount(e.target.value)} className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none focus:border-[var(--color-brand-primary)]" />
-                              </div>
-                              <div>
-                                 <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Sıklık</label>
-                                 <select value={frequency} onChange={e => setFrequency(e.target.value as any)} className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none">
-                                    <option value="monthly">Aylık</option>
-                                    <option value="once">Tek Sefer</option>
-                                 </select>
-                              </div>
-                           </div>
-
-                           <div className="grid grid-cols-1 gap-3">
-                              <div>
-                                 <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Tarih</label>
-                                 <input 
-                                    type="date" required value={nextDate} 
-                                    onChange={e => setNextDate(e.target.value)}
-                                    className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none [color-scheme:dark]" 
-                                 />
-                              </div>
-                           </div>
-
-                           <div ref={categoryRef} className="relative">
-                              <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Kategori</label>
-                              <input 
-                                 type="text" required value={category} 
-                                 onChange={e => { setCategory(e.target.value); setShowCategoryDropdown(true); }}
-                                 onFocus={() => setShowCategoryDropdown(true)}
-                                 className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none" 
-                              />
-                              {showCategoryDropdown && filteredCategories.length > 0 && (
-                                 <div className="absolute z-20 w-full mt-1 bg-[#1a1a1e] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-[150px] overflow-y-auto">
-                                    {filteredCategories.map(cat => (
-                                       <button key={cat} type="button" onClick={() => { setCategory(cat); setShowCategoryDropdown(false); }} className="w-full text-left px-4 py-2 text-xs text-white hover:bg-white/5">{cat}</button>
-                                    ))}
-                                 </div>
-                              )}
-                           </div>
-
-                           <div>
-                              <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Açıklama (Opsiyonel)</label>
-                              <input 
-                                 type="text" value={description} 
-                                 onChange={e => setDescription(e.target.value)}
-                                 placeholder="Örn: Kira yardımı, İnternet faturası..."
-                                 className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none focus:border-[var(--color-brand-primary)]" 
-                              />
-                              <div className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-2xl group hover:border-white/10 transition-all mt-4">
-                               <div className="flex flex-col">
-                                  <label className="text-[10px] font-bold text-white/70 uppercase tracking-widest leading-none">Raporlardan Muaf Tut</label>
-                                  <span className="text-[8px] text-white/30 font-medium mt-1">+/- tablosuna dahil edilmez</span>
-                               </div>
-                               <button 
-                                 type="button"
-                                 onClick={() => setIsExempt(!isExempt)}
-                                 className={`relative w-10 h-5 rounded-full transition-all duration-300 flex items-center px-1 ${isExempt ? 'bg-[var(--color-brand-primary)]' : 'bg-white/10'}`}
-                               >
-                                 <div className={`w-3 h-3 bg-white rounded-full transition-all duration-300 transform ${isExempt ? 'translate-x-5' : 'translate-x-0'}`} />
-                               </button>
-                            </div>
-                            <div className="flex items-center justify-between p-3 bg-purple-500/5 border border-purple-500/10 rounded-2xl group transition-all mt-2">
-                                <div className="flex flex-col">
-                                   <label className="text-[10px] font-bold text-purple-200 uppercase tracking-widest leading-none">Tahmini Tutar/Tarih</label>
-                                   <span className="text-[8px] text-purple-400 font-medium mt-1">Kesin olmayan öngörü</span>
-                                </div>
-                                <button 
-                                  type="button"
-                                  onClick={() => setIsEstimated(!isEstimated)}
-                                  className={`relative w-10 h-5 rounded-full transition-all duration-300 flex items-center px-1 ${isEstimated ? 'bg-purple-500' : 'bg-white/10'}`}
-                                >
-                                  <div className={`w-3 h-3 bg-white rounded-full transition-all duration-300 transform ${isEstimated ? 'translate-x-5' : 'translate-x-0'}`} />
-                                </button>
-                             </div>
-                           </div>
-
-                           <div>
-                              <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Banka Hesabı</label>
-                              <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none">
-                                 <option value="">Bağlamayı İptal Et</option>
-                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                              </select>
-                           </div>
-
-                           <button type="submit" className={`w-full py-4 rounded-2xl font-bold text-[#002113] transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl ${type === 'income' ? 'bg-[#4edeb3]/90 hover:bg-[#4edeb3]' : 'bg-[#ffb4ab]/90 hover:bg-[#ffb4ab]'}`}>
-                              İşlemi Kaydet
-                           </button>
-                        </form>
-                     </div>
-                  </div>
-
+               <div className="grid grid-cols-1 gap-8">
                   {/* List Column */}
-                  <div className="lg:col-span-2 space-y-4">
-                     <h3 className="text-xs font-bold text-white uppercase tracking-widest font-mono flex items-center gap-2">
-                        <AlertTriangle size={14} className="text-[#ffcf70]" /> Aktif Beklentiler ({projectedRecurringItems.length})
-                     </h3>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
+                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                        <h3 className="text-sm font-bold text-white uppercase tracking-widest font-mono flex items-center gap-2">
+                           <AlertTriangle size={18} className="text-[#ffcf70]" /> Aktif Beklentiler ({projectedRecurringItems.length})
+                        </h3>
+                        <button 
+                           onClick={() => setIsModalOpen(true)}
+                           className="px-5 py-2.5 bg-gradient-to-r from-[#4edeb3] to-[#3bc49c] text-[#002113] font-bold rounded-xl flex items-center gap-2 text-xs uppercase tracking-wider hover:brightness-110 transition-all shadow-lg shadow-[#4edeb3]/10"
+                        >
+                           <Plus size={16} /> Yeni Beklenti Ekle
+                        </button>
+                     </div>
+                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                         {projectedRecurringItems.map(rec => {
+    
                            const isFutureProjection = new Date(rec.next_date) < currentPeriod.start;
 
                            return (
@@ -1122,7 +1030,129 @@ export const RecurringTransactionsPage = () => {
             </motion.div>
           </div>
         )}
+      
+        {/* Add New Recurring Form Modal */}
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-lg bg-[#1a1c1e] border border-white/10 rounded-3xl shadow-2xl overflow-y-auto max-h-[90vh]"
+            >
+              <div className="p-6 space-y-5 bg-white/[0.02]">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-white uppercase tracking-widest">Yeni Beklenti Ekle</h3>
+                  <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-colors">
+                    <X size={16} />
+                  </button>
+                </div>
+                
+                <div className="flex p-1 bg-black/20 rounded-xl mb-4">
+                           <button onClick={() => setType('income')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${type === 'income' ? 'bg-[#4edeb3] text-[#002113]' : 'text-white/40'}`}>GELİR</button>
+                           <button onClick={() => setType('expense')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${type === 'expense' ? 'bg-[#ffb4ab] text-[#002113]' : 'text-white/40'}`}>GİDER</button>
+                        </div>
+                        
+                        <form onSubmit={handleManualSubmit} className="space-y-4">
+                           <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                 <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Miktar</label>
+                                 <input type="number" step="0.01" required value={amount} onChange={e => setAmount(e.target.value)} className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none focus:border-[var(--color-brand-primary)]" />
+                              </div>
+                              <div>
+                                 <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Sıklık</label>
+                                 <select value={frequency} onChange={e => setFrequency(e.target.value as any)} className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none">
+                                    <option value="monthly">Aylık</option>
+                                    <option value="once">Tek Sefer</option>
+                                 </select>
+                              </div>
+                           </div>
+
+                           <div className="grid grid-cols-1 gap-3">
+                              <div>
+                                 <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Tarih</label>
+                                 <input 
+                                    type="date" required value={nextDate} 
+                                    onChange={e => setNextDate(e.target.value)}
+                                    className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none [color-scheme:dark]" 
+                                 />
+                              </div>
+                           </div>
+
+                           <div ref={categoryRef} className="relative">
+                              <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Kategori</label>
+                              <input 
+                                 type="text" required value={category} 
+                                 onChange={e => { setCategory(e.target.value); setShowCategoryDropdown(true); }}
+                                 onFocus={() => setShowCategoryDropdown(true)}
+                                 className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none" 
+                              />
+                              {showCategoryDropdown && filteredCategories.length > 0 && (
+                                 <div className="absolute z-20 w-full mt-1 bg-[#1a1a1e] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-[150px] overflow-y-auto">
+                                    {filteredCategories.map(cat => (
+                                       <button key={cat} type="button" onClick={() => { setCategory(cat); setShowCategoryDropdown(false); }} className="w-full text-left px-4 py-2 text-xs text-white hover:bg-white/5">{cat}</button>
+                                    ))}
+                                 </div>
+                              )}
+                           </div>
+
+                           <div>
+                              <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Açıklama (Opsiyonel)</label>
+                              <input 
+                                 type="text" value={description} 
+                                 onChange={e => setDescription(e.target.value)}
+                                 placeholder="Örn: Kira yardımı, İnternet faturası..."
+                                 className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none focus:border-[var(--color-brand-primary)]" 
+                              />
+                              <div className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-2xl group hover:border-white/10 transition-all mt-4">
+                               <div className="flex flex-col">
+                                  <label className="text-[10px] font-bold text-white/70 uppercase tracking-widest leading-none">Raporlardan Muaf Tut</label>
+                                  <span className="text-[8px] text-white/30 font-medium mt-1">+/- tablosuna dahil edilmez</span>
+                               </div>
+                               <button 
+                                 type="button"
+                                 onClick={() => setIsExempt(!isExempt)}
+                                 className={`relative w-10 h-5 rounded-full transition-all duration-300 flex items-center px-1 ${isExempt ? 'bg-[var(--color-brand-primary)]' : 'bg-white/10'}`}
+                               >
+                                 <div className={`w-3 h-3 bg-white rounded-full transition-all duration-300 transform ${isExempt ? 'translate-x-5' : 'translate-x-0'}`} />
+                               </button>
+                            </div>
+                            <div className="flex items-center justify-between p-3 bg-purple-500/5 border border-purple-500/10 rounded-2xl group transition-all mt-2">
+                                <div className="flex flex-col">
+                                   <label className="text-[10px] font-bold text-purple-200 uppercase tracking-widest leading-none">Tahmini Tutar/Tarih</label>
+                                   <span className="text-[8px] text-purple-400 font-medium mt-1">Kesin olmayan öngörü</span>
+                                </div>
+                                <button 
+                                  type="button"
+                                  onClick={() => setIsEstimated(!isEstimated)}
+                                  className={`relative w-10 h-5 rounded-full transition-all duration-300 flex items-center px-1 ${isEstimated ? 'bg-purple-500' : 'bg-white/10'}`}
+                                >
+                                  <div className={`w-3 h-3 bg-white rounded-full transition-all duration-300 transform ${isEstimated ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </button>
+                             </div>
+                           </div>
+
+                           <div>
+                              <label className="text-[9px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest block mb-1">Banka Hesabı</label>
+                              <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} className="w-full px-3 py-2 bg-black/20 text-white border border-white/10 rounded-xl text-sm outline-none">
+                                 <option value="">Bağlamayı İptal Et</option>
+                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                              </select>
+                           </div>
+
+                           <button type="submit" className={`w-full py-4 rounded-2xl font-bold text-[#002113] transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl ${type === 'income' ? 'bg-[#4edeb3]/90 hover:bg-[#4edeb3]' : 'bg-[#ffb4ab]/90 hover:bg-[#ffb4ab]'}`}>
+                              İşlemi Kaydet
+                           </button>
+                        </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
+    
     </div>
   );
 };

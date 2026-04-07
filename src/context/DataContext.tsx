@@ -482,10 +482,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const deleteCard = useCallback(async (id: string) => {
+    const cardToRestore = state.creditCards.find(c => c.id === id);
     setState(prev => ({ ...prev, creditCards: prev.creditCards.filter(c => c.id !== id) }));
     const { error } = await supabase.from('credit_cards').delete().eq('id', id);
+    if (error && cardToRestore) {
+      setState(prev => ({ ...prev, creditCards: [cardToRestore, ...prev.creditCards].sort((a,b) => a.name.localeCompare(b.name)) }));
+      console.error("Kart silinemedi, bağlı harcamalar olabilir:", error);
+    }
     return { error };
-  }, []);
+  }, [state.creditCards]);
 
   const updateCard = useCallback(async (id: string, updates: Partial<CreditCard>) => {
     const { data, error } = await supabase.from('credit_cards').update(updates).eq('id', id).select();

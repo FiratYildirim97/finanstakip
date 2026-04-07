@@ -10,7 +10,8 @@ import {
   ImageIcon, FileText, Store, Tag, Hash, ChevronDown,
   Receipt, Eye, Loader2, CheckCircle2, AlertCircle,
   PlusCircle, Settings, Wallet, Calendar, List,
-  Clock, ArrowRight, Shield, Pencil
+  Clock, ArrowRight, Shield, Pencil, History, TrendingUp,
+  Info, ArrowUpRight, ArrowDownRight, Check, ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -573,6 +574,7 @@ export const TransactionsPage = () => {
 
   // Add-expense modal state
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -597,6 +599,12 @@ export const TransactionsPage = () => {
           <button onClick={() => setShowCardModal(true)} title="Yeni Kart Ekle"
             className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors border border-purple-500/15"
           ><PlusCircle size={14} /></button>
+          <button onClick={() => setShowHistoryModal(true)} title="Harcama Geçmişi"
+            className="p-1.5 rounded-lg bg-white/5 text-[var(--color-text-variant)] hover:bg-white/10 hover:text-white transition-colors border border-white/10"
+          ><History size={14} /></button>
+          <button onClick={() => setShowQuickInstallModal(true)} title="Hızlı Taksit Ekle"
+            className="p-1.5 rounded-lg bg-white/5 text-[var(--color-text-variant)] hover:bg-white/10 hover:text-[var(--color-brand-primary)] transition-colors border border-white/10"
+          ><TrendingUp size={14} /></button>
           <button onClick={() => setShowAddExpenseModal(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 text-white text-sm font-bold hover:brightness-110 transition-all shadow-lg shadow-purple-500/20"
           >
@@ -635,7 +643,14 @@ export const TransactionsPage = () => {
                   boxShadow: isActive ? `0 0 12px ${card.color}20` : 'none'
                 }}
               >
-                <button onClick={e => { e.stopPropagation(); if (confirm(`${card.name} kartını sil?`)) deleteCard(card.id); }}
+                <button onClick={async e => { 
+                    e.stopPropagation(); 
+                    if (confirm(`${card.name} kartını sil?`)) {
+                      const { error } = await deleteCard(card.id);
+                      if (error) toast.error("Karta bağlı harcamalar var! Önce harcamaları silin.");
+                      else toast.success("Kart başarıyla silindi.");
+                    }
+                  }}
                   className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 z-10 hover:bg-red-500 transition-opacity"
                 ><X size={9} /></button>
                 <div className="p-1 rounded-md" style={{ backgroundColor: `${card.color}25` }}>
@@ -682,6 +697,9 @@ export const TransactionsPage = () => {
                   <p className="text-[9px] text-[var(--color-text-variant)] font-mono uppercase">Aylık yük</p>
                   <p className="text-sm font-black text-pink-400 font-mono">{new Intl.NumberFormat('tr-TR').format(monthlyInstallmentAmount)}₺</p>
                 </div>
+                <button onClick={() => setShowQuickInstallModal(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-white bg-white/10 hover:bg-white/20 transition-colors border border-white/10 font-medium"
+                ><Plus size={11} /> Hızlı Ekle</button>
                 <button onClick={() => setShowInstallmentsModal(true)}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/15 font-medium"
                 ><Calendar size={11} /> Takvim</button>
@@ -773,89 +791,7 @@ export const TransactionsPage = () => {
         );
       })()}
 
-      {/* ── Category chips ── */}
-      {sortedCategories.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
-          {sortedCategories.map(([cat, total]) => (
-            <button key={cat}
-              onClick={() => setSelectedFilter(selectedFilter === cat ? 'all' : cat)}
-              className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-xs font-medium ${
-                selectedFilter === cat ? 'bg-white/10 border-white/20 text-white' : 'border-white/8 text-[var(--color-text-variant)] hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              <span>{CATEGORY_EMOJIS[cat] || '📦'}</span>
-              <span>{cat}</span>
-              <span className="font-mono opacity-60">{new Intl.NumberFormat('tr-TR', { notation: 'compact' }).format(total as number)}₺</span>
-            </button>
-          ))}
-          {selectedFilter !== 'all' && (
-            <button onClick={() => setSelectedFilter('all')}
-              className="shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs text-[var(--color-brand-tertiary)] hover:bg-white/5 transition-all"
-            ><X size={11} /> Tümü</button>
-          )}
-        </div>
-      )}
-
-      {/* ── Expense history list ── */}
-      <div className="bento-card p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
-          <span className="text-xs font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono flex items-center gap-1.5">
-            <Receipt size={12} className="text-purple-400" /> Harcama Geçmişi
-            {selectedFilter !== 'all' && <span className="text-purple-300">({selectedFilter})</span>}
-          </span>
-          <span className="text-[10px] text-[var(--color-text-variant)] font-mono">{filteredExpenses.length} kayıt · {new Intl.NumberFormat('tr-TR').format(filteredTotalExpenses)}₺</span>
-        </div>
-        {loading ? (
-          <div className="py-12 flex items-center justify-center gap-3 text-[var(--color-text-variant)] text-sm">
-            <Loader2 size={18} className="animate-spin text-purple-400" /> Yükleniyor…
-          </div>
-        ) : filteredExpenses.length === 0 ? (
-          <div className="py-10 flex flex-col items-center gap-3 text-[var(--color-text-variant)]">
-            <CreditCard size={28} className="opacity-20" />
-            <p className="text-sm">Henüz harcama yok</p>
-            <button onClick={() => setShowAddExpenseModal(true)}
-              className="text-xs text-purple-400 hover:text-purple-300 underline underline-offset-2 transition-colors"
-            >Harcama ekle →</button>
-          </div>
-        ) : (
-          <ul className="divide-y divide-white/5 max-h-[500px] overflow-y-auto">
-            {filteredExpenses.map(expense => (
-              <li key={expense.id}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors group"
-              >
-                <div className="p-2 rounded-xl shrink-0 text-base"
-                  style={{ backgroundColor: `${CATEGORY_COLORS[expense.category] || '#94a3b8'}15` }}
-                >{CATEGORY_EMOJIS[expense.category] || '📦'}</div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="font-semibold text-white text-sm">{expense.merchant || expense.category}</p>
-                    {expense.installments > 1 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/10 font-bold">{expense.installments}T</span>
-                    )}
-                    {expense.is_exempt && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/40 font-black uppercase">MUAF</span>}
-                    {expense.receipt_url && (
-                      <button onClick={() => setPreviewReceiptUrl(expense.receipt_url)}
-                        className="p-0.5 rounded hover:bg-white/10 transition-colors"
-                      ><Eye size={12} className="text-cyan-400" /></button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-variant)] mt-0.5 font-mono">
-                    <span>{expense.date}</span>
-                    {expense.card_name && <><span className="opacity-30">·</span><span>{expense.card_name}</span></>}
-                    {expense.merchant && expense.category && <span style={{ color: CATEGORY_COLORS[expense.category] }}>{expense.category}</span>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="font-black font-mono text-white text-base">-{new Intl.NumberFormat('tr-TR').format(expense.amount)}<span className="text-[var(--color-brand-tertiary)] text-sm">₺</span></span>
-                  <button onClick={() => deleteExpense(expense.id)}
-                    className="p-1.5 text-red-400/40 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                  ><Trash2 size={14} /></button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {/* ── Extracted to History Modal ── */}
 
       {/* ── MODALS ── */}
 
@@ -1338,6 +1274,228 @@ export const TransactionsPage = () => {
                   </div>
                 ))}
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* ── History Modal ── */}
+      <AnimatePresence>
+        {showHistoryModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setShowHistoryModal(false)}
+          >
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="bg-[var(--color-surface-container)] rounded-t-3xl sm:rounded-3xl w-full sm:max-w-2xl border border-white/10 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-white/5"><History size={16} className="text-white" /></div>
+                  <h3 className="font-bold text-white">Harcama Geçmişi</h3>
+                </div>
+                <button onClick={() => setShowHistoryModal(false)} className="p-1.5 rounded-lg bg-white/5 text-[var(--color-text-variant)] hover:text-white hover:bg-white/10"><X size={16} /></button>
+              </div>
+              <div className="flex flex-col flex-1 overflow-hidden p-0">
+                {/* ── Category chips ── */}
+                {sortedCategories.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto p-4 border-b border-white/5 scrollbar-hide shrink-0">
+                    {sortedCategories.map(([cat, total]) => (
+                      <button key={cat}
+                        onClick={() => setSelectedFilter(selectedFilter === cat ? 'all' : cat)}
+                        className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-xs font-medium ${
+                          selectedFilter === cat ? 'bg-white/10 border-white/20 text-white' : 'border-white/8 text-[var(--color-text-variant)] hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        <span>{CATEGORY_EMOJIS[cat] || '📦'}</span>
+                        <span>{cat}</span>
+                        <span className="font-mono opacity-60">{new Intl.NumberFormat('tr-TR', { notation: 'compact' }).format(total as number)}₺</span>
+                      </button>
+                    ))}
+                    {selectedFilter !== 'all' && (
+                      <button onClick={() => setSelectedFilter('all')}
+                        className="shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs text-[var(--color-brand-tertiary)] hover:bg-white/5 transition-all"
+                      ><X size={11} /> Tümü</button>
+                    )}
+                  </div>
+                )}
+                <div className="px-4 py-2 border-b border-white/5 bg-black/20 flex justify-between items-center text-xs text-[var(--color-text-variant)] font-mono shrink-0">
+                   <span>{filteredExpenses.length} kayıt bulunuyor</span>
+                   <span>Toplam: {new Intl.NumberFormat('tr-TR').format(filteredTotalExpenses)}₺</span>
+                </div>
+                {/* ── Expense history list ── */}
+                <div className="overflow-y-auto flex-1">
+                  {loading ? (
+                    <div className="py-12 flex items-center justify-center gap-3 text-[var(--color-text-variant)] text-sm">
+                      <Loader2 size={18} className="animate-spin text-purple-400" /> Yükleniyor…
+                    </div>
+                  ) : filteredExpenses.length === 0 ? (
+                    <div className="py-10 flex flex-col items-center gap-3 text-[var(--color-text-variant)]">
+                      <CreditCard size={28} className="opacity-20" />
+                      <p className="text-sm">Henüz harcama yok</p>
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-white/5">
+                      {filteredExpenses.map(expense => (
+                        <li key={expense.id}
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors group"
+                        >
+                          <div className="p-2 rounded-xl shrink-0 text-base"
+                            style={{ backgroundColor: `${CATEGORY_COLORS[expense.category] || '#94a3b8'}15` }}
+                          >{CATEGORY_EMOJIS[expense.category] || '📦'}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-semibold text-white text-sm">{expense.merchant || expense.category}</p>
+                              {expense.installments > 1 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/10 font-bold">{expense.installments}T</span>
+                              )}
+                              {expense.is_exempt && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/40 font-black uppercase">MUAF</span>}
+                              {expense.receipt_url && (
+                                <button onClick={() => setPreviewReceiptUrl(expense.receipt_url)}
+                                  className="p-0.5 rounded hover:bg-white/10 transition-colors"
+                                ><Eye size={12} className="text-cyan-400" /></button>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-variant)] mt-0.5 font-mono">
+                              <span>{expense.date}</span>
+                              {expense.card_name && <><span className="opacity-30">·</span><span>{expense.card_name}</span></>}
+                              {expense.merchant && expense.category && <span style={{ color: CATEGORY_COLORS[expense.category] }}>{expense.category}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-black font-mono text-white text-base">-{new Intl.NumberFormat('tr-TR').format(expense.amount)}<span className="text-[var(--color-brand-tertiary)] text-sm">₺</span></span>
+                            <button onClick={async () => {
+                                if (confirm(`Silmek istediğinize emin misiniz?`)) {
+                                  const { error } = await deleteExpense(expense.id);
+                                  if (error) toast.error("Hata oluştu");
+                                }
+                              }}
+                              className="p-1.5 text-red-400/40 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            ><Trash2 size={14} /></button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Quick Installment Modal ── */}
+      <AnimatePresence>
+        {showQuickInstallModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-center justify-center p-4"
+            onClick={() => setShowQuickInstallModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-[var(--color-surface-container)] rounded-3xl w-full max-w-sm border border-white/10 shadow-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/20"><TrendingUp size={16} className="text-purple-400" /></div>
+                  <div>
+                    <h3 className="font-bold text-white">Mevcut Taksit Ekle</h3>
+                    <p className="text-xs text-[var(--color-text-variant)]">Önceden kalma taksitler</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowQuickInstallModal(false)} className="p-1.5 rounded-lg bg-white/5 text-[var(--color-text-variant)] hover:text-white hover:bg-white/10"><X size={16} /></button>
+              </div>
+              <form onSubmit={async e => {
+                e.preventDefault();
+                setIsQiSubmitting(true);
+                if (!qiCardId || !qiAmount || !qiCurrentInstallment || !qiTotalInstallments || !qiMerchant) {
+                  setIsQiSubmitting(false);
+                  return toast.error("Lütfen tüm alanları doldurun.");
+                }
+                const totalM = parseInt(qiTotalInstallments);
+                const currentM = parseInt(qiCurrentInstallment);
+                const amt = parseFloat(qiAmount);
+                if (totalM < currentM || amt <= 0) {
+                  setIsQiSubmitting(false);
+                  return toast.error("Geçersiz taksit veya tutar");
+                }
+                const totalAmount = amt * totalM;
+                
+                // Calculate historical start date
+                const now = new Date();
+                const pastMonths = currentM - 1;
+                now.setMonth(now.getMonth() - pastMonths);
+                
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const dd = String(now.getDate()).padStart(2, '0');
+                
+                const { error } = await addExpense({
+                  card_id: qiCardId,
+                  amount: totalAmount,
+                  category: qiCategory,
+                  merchant: qiMerchant,
+                  date: `${yyyy}-${mm}-${dd}`,
+                  installments: totalM,
+                  is_exempt: false,
+                  description: 'Hızlı eklenen geçmiş taksit'
+                });
+                setIsQiSubmitting(false);
+                if (error) toast.error("Eklenemedi");
+                else {
+                  toast.success("Taksit eklendi");
+                  setShowQuickInstallModal(false);
+                  setQiMerchant(''); setQiAmount(''); setQiTotalInstallments('12'); setQiCurrentInstallment('1');
+                }
+              }} className="p-5 space-y-4">
+                <div className="space-y-3">
+                  <input type="text" required value={qiMerchant} onChange={e => setQiMerchant(e.target.value)}
+                    className="w-full px-4 py-3 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                    placeholder="Mağaza veya Alışveriş Adı"
+                  />
+                  <div className="relative">
+                    <label className="text-[10px] text-[var(--color-text-variant)] absolute -top-2 left-3 bg-[var(--color-surface-container)] px-1">Aylık Tutar</label>
+                    <input type="number" required value={qiAmount} onChange={e => setQiAmount(e.target.value)}
+                      className="w-full px-4 py-3 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                      placeholder="0.00" step="0.01"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="relative">
+                      <label className="text-[10px] text-[var(--color-text-variant)] absolute -top-2 left-3 bg-[var(--color-surface-container)] px-1">Toplam Taksit</label>
+                      <input type="number" required value={qiTotalInstallments} onChange={e => setQiTotalInstallments(e.target.value)}
+                        className="w-full px-4 py-3 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                        placeholder="Örn: 12" min="2" max="36"
+                      />
+                    </div>
+                    <div className="relative">
+                      <label className="text-[10px] text-[var(--color-text-variant)] absolute -top-2 left-3 bg-[var(--color-surface-container)] px-1">Şu An Kaçıncı</label>
+                      <input type="number" required value={qiCurrentInstallment} onChange={e => setQiCurrentInstallment(e.target.value)}
+                        className="w-full px-4 py-3 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                        placeholder="Örn: 3" min="1" max="36"
+                      />
+                    </div>
+                  </div>
+                  <select required value={qiCategory} onChange={e => setQiCategory(e.target.value)}
+                    className="w-full px-4 py-3 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm appearance-none"
+                  >
+                    {CREDIT_CARD_CATEGORIES.map(cat => <option key={cat} value={cat} className="bg-[#1a1c1e]">{CATEGORY_EMOJIS[cat]} {cat}</option>)}
+                  </select>
+                  <select required value={qiCardId} onChange={e => setQiCardId(e.target.value)}
+                    className="w-full px-4 py-3 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm appearance-none"
+                  >
+                    <option value="" disabled>Kart Seçiniz...</option>
+                    {cards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <button type="submit" disabled={isQiSubmitting} className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl py-3 font-bold hover:brightness-110 transition-all text-sm disabled:opacity-50">
+                  {isQiSubmitting ? 'Ekleniyor...' : 'Taksiti Ekle'}
+                </button>
+              </form>
             </motion.div>
           </motion.div>
         )}
