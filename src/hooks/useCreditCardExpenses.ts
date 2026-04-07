@@ -1,7 +1,7 @@
 import { useData } from '../context/DataContext';
 
 export const useCreditCardExpenses = () => {
-  const { creditCardExpenses: expenses, loading, addExpense, deleteExpense, uploadReceipt } = useData();
+  const { creditCardExpenses: expenses, loading, addExpense, deleteExpense, updateExpense, uploadReceipt } = useData();
 
   // Toplam harcama
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -16,7 +16,8 @@ export const useCreditCardExpenses = () => {
     expenses, 
     loading, 
     addExpense, 
-    deleteExpense, 
+    deleteExpense,
+    updateExpense,
     uploadReceipt,
     totalExpenses,
     expensesByCategory 

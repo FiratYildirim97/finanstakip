@@ -10,7 +10,7 @@ import {
   ImageIcon, FileText, Store, Tag, Hash, ChevronDown,
   Receipt, Eye, Loader2, CheckCircle2, AlertCircle,
   PlusCircle, Settings, Wallet, Calendar, List,
-  Clock, ArrowRight, Shield
+  Clock, ArrowRight, Shield, Pencil
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -51,7 +51,7 @@ const CATEGORY_EMOJIS: Record<string, string> = {
 type InputMode = 'ai-text' | 'ai-photo' | 'manual';
 
 export const TransactionsPage = () => {
-  const { expenses, loading, addExpense, deleteExpense, uploadReceipt } = useCreditCardExpenses();
+  const { expenses, loading, addExpense, deleteExpense, updateExpense, uploadReceipt } = useCreditCardExpenses();
   const { cards, addCard, deleteCard, syncCardToRecurring, getCardMonthlyTotal } = useCreditCards();
 
   // Input mode 
@@ -112,12 +112,114 @@ export const TransactionsPage = () => {
   // AI Category Suggestion State
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
 
+  // Quick Import Installment Modal
+  const [showQuickInstallModal, setShowQuickInstallModal] = useState(false);
+  const [qiMerchant, setQiMerchant] = useState('');
+  const [qiAmount, setQiAmount] = useState('');
+  const [qiTotalInstallments, setQiTotalInstallments] = useState('12');
+  const [qiCurrentInstallment, setQiCurrentInstallment] = useState('1');
+  const [qiCategory, setQiCategory] = useState('Diğer');
+  const [qiCardId, setQiCardId] = useState('');
+  const [isQiSubmitting, setIsQiSubmitting] = useState(false);
+
+  // Edit expense modal
+  const [editingExpense, setEditingExpense] = useState<any | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editInstallments, setEditInstallments] = useState('1');
+  const [editCategory, setEditCategory] = useState('Market');
+  const [editMerchant, setEditMerchant] = useState('');
+  const [editCardId, setEditCardId] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [isEditSaving, setIsEditSaving] = useState(false);
+
+  const openEditModal = (expense: any) => {
+    setEditingExpense(expense);
+    setEditAmount(String(expense.amount));
+    setEditInstallments(String(expense.installments || 1));
+    setEditCategory(expense.category || 'Market');
+    setEditMerchant(expense.merchant || '');
+    setEditCardId(expense.card_id || '');
+    setEditDescription(expense.description || '');
+  };
+
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingExpense) return;
+    setIsEditSaving(true);
+    const { error } = await updateExpense(editingExpense.id, {
+      amount: parseFloat(editAmount),
+      installments: parseInt(editInstallments),
+      category: editCategory,
+      merchant: editMerchant || null,
+      card_id: editCardId || null,
+      card_name: cards.find(c => c.id === editCardId)?.name || editingExpense.card_name,
+      description: editDescription || null,
+    });
+    if (!error) {
+      toast.success('Harcama güncellendi ✅');
+      setEditingExpense(null);
+    } else {
+      toast.error('Güncelleme başarısız');
+    }
+    setIsEditSaving(false);
+  };
+
   // Auto-select first card
   useEffect(() => {
     if (cards.length > 0 && !selectedCardId) {
       setSelectedCardId(cards[0].id);
     }
-  }, [cards, selectedCardId]);
+    if (cards.length > 0 && !qiCardId) {
+      setQiCardId(cards[0].id);
+    }
+  }, [cards, selectedCardId, qiCardId]);
+
+  // Handle quick-import installment submit
+  const handleQuickInstallSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const totalAmt = parseFloat(qiAmount);
+    const total = parseInt(qiTotalInstallments);
+    const current = parseInt(qiCurrentInstallment);
+    if (!totalAmt || !total || !current || current > total) return;
+
+    setIsQiSubmitting(true);
+    // Calculate the start date: go back (current - 1) months from today
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - (current - 1));
+    const startDateStr = startDate.toISOString().split('T')[0];
+
+    const selectedCard = cards.find(c => c.id === qiCardId);
+    const { error } = await addExpense({
+      amount: totalAmt,
+      category: qiCategory,
+      description: `Mevcut Taksit / ${total} taksit`,
+      merchant: qiMerchant || null,
+      card_name: selectedCard?.name || null,
+      card_id: qiCardId || null,
+      installments: total,
+      is_exempt: false,
+      receipt_url: null,
+      date: startDateStr,
+    });
+
+    if (!error) {
+      toast.success(`✅ ${qiMerchant || 'Taksit'} aktarıldı! (${current}/${total} taksit, ${new Intl.NumberFormat('tr-TR').format(totalAmt / total)} ₺/ay)`);
+      setQiMerchant('');
+      setQiAmount('');
+      setQiTotalInstallments('12');
+      setQiCurrentInstallment('1');
+      setQiCategory('Diğer');
+      setShowQuickInstallModal(false);
+      // Sync card total
+      if (selectedCard) {
+        const total2 = getCardMonthlyTotal(selectedCard.id, expenses);
+        syncCardToRecurring(selectedCard.id, total2, selectedCard.name, selectedCard.payment_day);
+      }
+    } else {
+      toast.error('Kayıt sırasında hata oluştu');
+    }
+    setIsQiSubmitting(false);
+  };
 
   // Auto-categorize based on description
   useEffect(() => {
@@ -469,1308 +571,778 @@ export const TransactionsPage = () => {
     .sort(([, a], [, b]) => (b as number) - (a as number))
     .slice(0, 5), [expensesBySelectedCardCategory]);
 
-  return (
-    <div className="space-y-6 md:space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white font-display flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/20">
-              <CreditCard size={28} className="text-purple-400" />
-            </div>
-            Kredi Kartı Harcamaları
-          </h1>
-          <p className="text-[var(--color-text-variant)] mt-2 text-sm">
-            Harcamalarınızı AI ile yazı veya fiş fotoğrafı ile kolayca ekleyin
-            {selectedCard && (
-              <span className="block mt-1 text-xs text-purple-300">
-                Görüntülenen kart: {selectedCard.name}
-              </span>
-            )}
-          </p>
-        </div>
+  // Add-expense modal state
+  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
 
-        {/* Total Expenses Badge */}
-        <div className="glass-panel px-6 py-4 rounded-2xl flex items-center gap-4">
-          <div>
-            <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Toplam Harcama</p>
-            <p className="text-2xl font-black text-white font-mono mt-0.5">
-              {new Intl.NumberFormat('tr-TR').format(filteredTotalExpenses)} <span className="text-[var(--color-brand-tertiary)] text-lg">₺</span>
-            </p>
+  return (
+    <div className="space-y-4">
+
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-purple-500/15 border border-purple-500/20">
+            <CreditCard size={18} className="text-purple-400" />
           </div>
+          <h1 className="text-lg font-bold text-white font-display">Kredi Kartı</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {cards.length > 0 && (
+            <button onClick={handleSyncToRecurring} title="Aylığa Senkronize Et"
+              className="p-1.5 rounded-lg bg-[var(--color-brand-primary)]/10 text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/20 transition-colors border border-[var(--color-brand-primary)]/15"
+            ><Calendar size={14} /></button>
+          )}
+          <button onClick={() => setShowQuickInstallModal(true)} title="Mevcut Taksit Aktar"
+            className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors border border-amber-500/15"
+          ><Clock size={14} /></button>
+          <button onClick={() => setShowCardModal(true)} title="Yeni Kart Ekle"
+            className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors border border-purple-500/15"
+          ><PlusCircle size={14} /></button>
+          <button onClick={() => setShowAddExpenseModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 text-white text-sm font-bold hover:brightness-110 transition-all shadow-lg shadow-purple-500/20"
+          >
+            <Plus size={15} /> Harcama Ekle
+          </button>
         </div>
       </div>
 
-      {/* My Cards Section */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono flex items-center gap-2">
-            <Wallet size={14} /> Kartlarım
-          </h3>
-          <div className="flex items-center gap-2">
-            {cards.length > 0 && (
-              <button
-                onClick={handleSyncToRecurring}
-                className="text-xs px-3 py-1.5 rounded-lg bg-[var(--color-brand-primary)]/10 text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/20 transition-colors font-medium flex items-center gap-1.5 border border-[var(--color-brand-primary)]/20"
-              >
-                <Calendar size={12} /> Aylığa Senkronize Et
-              </button>
-            )}
-            <button
-              onClick={() => setShowCardModal(true)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors font-medium flex items-center gap-1.5 border border-purple-500/20"
-            >
-              <PlusCircle size={12} /> Yeni Kart
-            </button>
-          </div>
-        </div>
-
-        {cards.length === 0 ? (
-          <button
-            onClick={() => setShowCardModal(true)}
-            className="w-full p-6 border-2 border-dashed border-white/10 rounded-2xl text-[var(--color-text-variant)] hover:border-purple-500/30 hover:bg-purple-500/5 transition-all flex flex-col items-center gap-2 cursor-pointer"
-          >
-            <CreditCard size={24} className="opacity-50" />
-            <span className="text-sm font-medium">Henüz kart eklenmemiş</span>
-            <span className="text-xs opacity-70">Kart ekleyerek harcamalarınızı kartlara ayırın</span>
-          </button>
-        ) : (
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            {/* All Cards Option */}
-            <div
-              onClick={() => setFilterCardId(null)}
-              className={`relative min-w-[120px] p-4 rounded-2xl cursor-pointer transition-all shrink-0 flex flex-col items-center justify-center gap-2 border border-white/10 ${!filterCardId
-                ? 'bg-white/10 ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]'
-                : 'bg-white/5 hover:bg-white/10'
+      {/* ── Cards chip strip ── */}
+      {cards.length === 0 ? (
+        <button onClick={() => setShowCardModal(true)}
+          className="w-full py-5 border border-dashed border-white/10 rounded-xl text-[var(--color-text-variant)] hover:border-purple-500/30 hover:bg-purple-500/5 transition-all flex items-center justify-center gap-2 text-sm"
+        >
+          <CreditCard size={16} className="opacity-50" /> Kart ekleyerek başlayın…
+        </button>
+      ) : (
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <button onClick={() => setFilterCardId(null)}
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all text-sm font-medium ${
+              !filterCardId ? 'bg-white/10 border-white/20 text-white' : 'border-white/8 text-[var(--color-text-variant)] hover:bg-white/5 hover:text-white'
+            }`}
+          ><Wallet size={13} /> Tümü</button>
+          {cards.map(card => {
+            const cardTotal = getCardMonthlyTotal(card.id, expenses);
+            const usagePercent = card.card_limit ? Math.min((cardTotal / card.card_limit) * 100, 100) : 0;
+            const isActive = filterCardId === card.id;
+            return (
+              <button key={card.id}
+                onClick={() => { setFilterCardId(card.id); setSelectedCardId(card.id); }}
+                className={`relative shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all group ${
+                  isActive ? 'ring-1' : 'hover:bg-white/5'
                 }`}
-            >
-              <div className="p-2 rounded-xl bg-white/10">
-                <Wallet size={16} className="text-white" />
-              </div>
-              <span className="text-xs font-bold text-white">Tüm Kartlar</span>
-            </div>
-
-            {cards.map(card => {
-              const cardTotal = getCardMonthlyTotal(card.id, expenses);
-              const usagePercent = card.card_limit ? Math.min((cardTotal / card.card_limit) * 100, 100) : 0;
-              return (
-                <div
-                  key={card.id}
-                  onClick={() => {
-                    setFilterCardId(card.id);
-                    setSelectedCardId(card.id);
-                  }}
-                  className={`relative min-w-[200px] p-4 rounded-2xl cursor-pointer transition-all shrink-0 group ${filterCardId === card.id
-                    ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]'
-                    : 'hover:scale-[1.02]'
-                    }`}
-                  style={{
-                    background: `linear-gradient(135deg, ${card.color}20, ${card.color}05)`,
-                    border: `1px solid ${card.color}30`,
-                  }}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`${card.name} kartını silmek istediğinize emin misiniz?`)) deleteCard(card.id);
-                    }}
-                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/30 text-white/50 hover:text-red-400 hover:bg-black/50 transition-all bg-white/5 text-white lg:text-[var(--color-text-variant)] lg:bg-transparent opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 rounded-lg" style={{ backgroundColor: `${card.color}30` }}>
-                      <CreditCard size={14} style={{ color: card.color }} />
-                    </div>
-                    <div>
-                      <p className="text-white font-bold text-sm">{card.name}</p>
-                      {card.last_four && <p className="text-[10px] text-[var(--color-text-variant)] font-mono">**** {card.last_four}</p>}
-                    </div>
-                  </div>
-                  {card.bank && <p className="text-[10px] text-[var(--color-text-variant)] mb-2">{card.bank}</p>}
-                  <p className="text-lg font-black font-mono text-white">
-                    {new Intl.NumberFormat('tr-TR').format(cardTotal)} <span className="text-xs" style={{ color: card.color }}>₺</span>
+                style={{
+                  background: isActive ? `${card.color}15` : 'transparent',
+                  borderColor: isActive ? `${card.color}50` : 'rgba(255,255,255,0.08)',
+                  boxShadow: isActive ? `0 0 12px ${card.color}20` : 'none'
+                }}
+              >
+                <button onClick={e => { e.stopPropagation(); if (confirm(`${card.name} kartını sil?`)) deleteCard(card.id); }}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 z-10 hover:bg-red-500 transition-opacity"
+                ><X size={9} /></button>
+                <div className="p-1 rounded-md" style={{ backgroundColor: `${card.color}25` }}>
+                  <CreditCard size={12} style={{ color: card.color }} />
+                </div>
+                <div className="text-left">
+                  <p className="text-white font-semibold text-sm leading-none truncate max-w-[90px]">{card.name}</p>
+                  <p className="text-[10px] text-[var(--color-text-variant)] mt-0.5 font-mono">
+                    {new Intl.NumberFormat('tr-TR', { notation: 'compact' }).format(cardTotal)}₺
+                    {card.card_limit && <span className="opacity-50"> / {new Intl.NumberFormat('tr-TR', { notation: 'compact' }).format(card.card_limit)}₺</span>}
                   </p>
                   {card.card_limit && (
-                    <div className="mt-2">
-                      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${usagePercent}%`,
-                            backgroundColor: usagePercent > 80 ? '#f87171' : card.color,
-                          }}
-                        />
-                      </div>
-                      <p className="text-[9px] text-[var(--color-text-variant)] mt-1 font-mono">
-                        {new Intl.NumberFormat('tr-TR').format(cardTotal)} / {new Intl.NumberFormat('tr-TR').format(card.card_limit)} ₺
-                      </p>
+                    <div className="h-0.5 rounded-full mt-1 w-14 bg-white/10 overflow-hidden">
+                      <div style={{ width: `${usagePercent}%`, backgroundColor: usagePercent > 80 ? '#f87171' : card.color }} className="h-full rounded-full" />
                     </div>
                   )}
-                  <div className="mt-2 flex items-center gap-1.5 text-[10px] text-[var(--color-text-variant)]">
-                    <Calendar size={10} />
-                    <span>Son ödeme: Her ayın <strong className="text-white">{card.payment_day}</strong>'i</span>
-                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Category Summary Bar */}
-      {sortedCategories.length > 0 && (
-        <div className="glass-panel rounded-2xl p-4 overflow-x-auto">
-          <div className="flex gap-3 min-w-max">
-            {sortedCategories.map(([cat, total]) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedFilter(selectedFilter === cat ? 'all' : cat)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all text-sm font-medium border ${selectedFilter === cat
-                    ? 'bg-white/10 border-white/20 text-white shadow-lg'
-                    : 'border-transparent hover:bg-white/5 text-[var(--color-text-variant)] hover:text-white'
-                  }`}
-              >
-                <span className="text-lg">{CATEGORY_EMOJIS[cat] || '📦'}</span>
-                <span>{cat}</span>
-                <span className="font-mono text-xs px-2 py-0.5 rounded-lg" style={{ backgroundColor: `${CATEGORY_COLORS[cat] || '#94a3b8'}20`, color: CATEGORY_COLORS[cat] || '#94a3b8' }}>
-                  {new Intl.NumberFormat('tr-TR', { notation: 'compact' }).format(total as number)} ₺
-                </span>
               </button>
-            ))}
-            {selectedFilter !== 'all' && (
-              <button
-                onClick={() => setSelectedFilter('all')}
-                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs text-[var(--color-brand-tertiary)] hover:bg-[var(--color-brand-tertiary)]/10 transition-all"
-              >
-                <X size={14} /> Filtreyi Kaldır
-              </button>
-            )}
-          </div>
+            );
+          })}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        {/* Left Panel - Input Area */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Input Mode Selector */}
-          <div className="glass-panel rounded-2xl p-1.5 flex gap-1">
-            <button
-              onClick={() => setInputMode('ai-text')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${inputMode === 'ai-text'
-                  ? 'bg-gradient-to-br from-purple-500/30 to-pink-500/20 text-purple-300 shadow-lg border border-purple-500/20'
-                  : 'text-[var(--color-text-variant)] hover:text-white hover:bg-white/5'
-                }`}
-            >
-              <Sparkles size={16} />
-              <span className="hidden sm:inline">AI</span> Yazı
-            </button>
-            <button
-              onClick={() => setInputMode('ai-photo')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${inputMode === 'ai-photo'
-                  ? 'bg-gradient-to-br from-purple-500/30 to-pink-500/20 text-purple-300 shadow-lg border border-purple-500/20'
-                  : 'text-[var(--color-text-variant)] hover:text-white hover:bg-white/5'
-                }`}
-            >
-              <Camera size={16} />
-              <span className="hidden sm:inline">AI</span> Fotoğraf
-            </button>
-            <button
-              onClick={() => setInputMode('manual')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${inputMode === 'manual'
-                  ? 'bg-gradient-to-br from-[var(--color-brand-primary)]/20 to-[var(--color-brand-primary)]/10 text-[var(--color-brand-primary)] shadow-lg border border-[var(--color-brand-primary)]/20'
-                  : 'text-[var(--color-text-variant)] hover:text-white hover:bg-white/5'
-                }`}
-            >
-              <Plus size={16} />
-              Manuel
-            </button>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {/* AI Text Mode */}
-            {inputMode === 'ai-text' && (
-              <motion.div
-                key="ai-text"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="glass-panel p-6 rounded-3xl relative overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.4)]"
-              >
-                {/* Decorative gradient */}
-                <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full blur-3xl -mr-10 -mt-10" />
-                <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-purple-600/10 to-transparent rounded-full blur-2xl -ml-8 -mb-8" />
-
-                <div className="flex items-center gap-2 text-purple-400 font-bold mb-4 font-display text-lg relative z-10">
-                  <div className="p-1.5 rounded-lg bg-purple-500/20">
-                    <Sparkles size={18} />
-                  </div>
-                  AI ile Akıllı Ekle
+      {/* ── This month installments ── */}
+      {(() => {
+        const now = new Date();
+        const monthlyInstallmentAmount = installmentExpenses.reduce((sum, e) => sum + (e.amount / e.installments), 0);
+        const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const currentMonthData = futureMonthlyInstallments.find(m => m.key === currentMonthKey);
+        const currentMonthItems = currentMonthData?.items || [];
+        const currentMonthTotal = currentMonthData?.total || 0;
+        if (installmentExpenses.length === 0) return null;
+        return (
+          <div className="bento-card p-0 overflow-hidden">
+            {/* Summary bar */}
+            <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <List size={14} className="text-purple-400" />
+                <span className="text-sm font-bold text-white">Taksitler</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-300 font-mono border border-purple-500/10">{installmentExpenses.length} aktif</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-[9px] text-[var(--color-text-variant)] font-mono uppercase">Aylık yük</p>
+                  <p className="text-sm font-black text-pink-400 font-mono">{new Intl.NumberFormat('tr-TR').format(monthlyInstallmentAmount)}₺</p>
                 </div>
-                <p className="text-xs text-[var(--color-text-variant)] mb-4 relative z-10">
-                  Harcamanızı doğal dilde yazın, AI otomatik olarak çözümleyecek
-                </p>
-                {/* Card Selector */}
-                {cards.length > 0 && (
-                  <div className="relative z-10 mb-3">
-                    <select
-                      value={selectedCardId}
-                      onChange={e => setSelectedCardId(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)]/50 text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors text-sm appearance-none"
-                    >
-                      {cards.map(c => (
-                        <option key={c.id} value={c.id}>
-                          💳 {c.name}{c.last_four ? ` (*${c.last_four})` : ''}{c.bank ? ` - ${c.bank}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <form onSubmit={handleAiTextSubmit} className="relative z-10 w-full">
-                  <textarea
-                    value={aiInput}
-                    onChange={(e) => setAiInput(e.target.value)}
-                    placeholder="Örn: Migros'tan 850 liraya haftalık market alışverişi yaptım, 3 taksit..."
-                    className="w-full px-5 py-4 bg-[var(--color-surface-lowest)]/50 border border-white/10 rounded-2xl outline-none focus:ring-1 focus:ring-purple-500/50 focus:bg-[var(--color-surface-lowest)] transition-all resize-none pb-16 text-[var(--color-text-main)] placeholder-[var(--color-text-variant)]/50 text-sm"
-                    rows={4}
-                  />
-                  <button
-                    type="submit"
-                    disabled={isAiLoading || !aiInput.trim()}
-                    className="absolute bottom-3 right-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-40 disabled:grayscale flex items-center gap-2 hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:scale-[1.02] active:scale-[0.98]"
-                  >
-                    {isAiLoading ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        Çözümleniyor...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={14} />
-                        AI ile Ekle
-                      </>
-                    )}
-                  </button>
-                </form>
-              </motion.div>
-            )}
-
-            {/* AI Photo Mode */}
-            {inputMode === 'ai-photo' && (
-              <motion.div
-                key="ai-photo"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="glass-panel p-6 rounded-3xl relative overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.4)]"
-              >
-                <div className="absolute top-0 left-0 w-40 h-40 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 rounded-full blur-3xl -ml-10 -mt-10" />
-
-                <div className="flex items-center gap-2 text-cyan-400 font-bold mb-4 font-display text-lg relative z-10">
-                  <div className="p-1.5 rounded-lg bg-cyan-500/20">
-                    <Camera size={18} />
-                  </div>
-                  Fiş / Dekont ile Ekle
+                <button onClick={() => setShowInstallmentsModal(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 transition-colors border border-purple-500/15 font-medium"
+                ><Calendar size={11} /> Takvim</button>
+              </div>
+            </div>
+            {/* This month */}
+            {currentMonthItems.length > 0 && (
+              <div className="px-4 py-2 bg-amber-500/[0.04] border-b border-amber-500/10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest font-mono">Bu Ay Ödenecek</span>
+                  <span className="text-sm font-black text-amber-400 font-mono">{new Intl.NumberFormat('tr-TR').format(currentMonthTotal)}₺</span>
                 </div>
-                <p className="text-xs text-[var(--color-text-variant)] mb-4 relative z-10">
-                  Fiş veya dekont fotoğrafı yükleyin, AI içeriği otomatik okuyacak
-                </p>
-                {/* Card Selector */}
-                {cards.length > 0 && (
-                  <div className="relative z-10 mb-4">
-                    <select
-                      value={selectedCardId}
-                      onChange={e => setSelectedCardId(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)]/50 text-white border border-white/10 rounded-xl outline-none focus:border-cyan-500/50 transition-colors text-sm appearance-none"
-                    >
-                      {cards.map(c => (
-                        <option key={c.id} value={c.id}>
-                          💳 {c.name}{c.last_four ? ` (*${c.last_four})` : ''}{c.bank ? ` - ${c.bank}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Upload Area */}
-                {!imagePreview ? (
-                  <div className="relative z-10 space-y-4">
-                    {/* Hidden file inputs */}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => e.target.files?.[0] && handleImageSelect(e.target.files[0])}
-                      className="hidden"
-                    />
-                    <input
-                      ref={cameraInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) => e.target.files?.[0] && handleImageSelect(e.target.files[0])}
-                      className="hidden"
-                    />
-
-                    {/* Two action buttons */}
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* Camera Button */}
-                      <button
-                        type="button"
-                        onClick={() => cameraInputRef.current?.click()}
-                        className="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 border-dashed border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10 hover:border-cyan-400/50 transition-all cursor-pointer group"
-                      >
-                        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/10 group-hover:scale-110 transition-transform">
-                          <Camera size={28} className="text-cyan-400" />
+                <div className="space-y-1">
+                  {currentMonthItems.map((item: any) => (
+                    <div key={`curr-${item.id}`} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5 transition-colors group/item">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{CATEGORY_EMOJIS[item.category] || '📦'}</span>
+                        <div>
+                          <p className="text-sm font-semibold text-white leading-none">{item.merchant || item.category}</p>
+                          <span className="text-[10px] text-purple-300 font-mono">{item.currentInstallmentNumber}/{item.installments}. taksit</span>
                         </div>
-                        <div className="text-center">
-                          <p className="text-white font-bold text-sm">Kamera ile Çek</p>
-                          <p className="text-[var(--color-text-variant)] text-[10px] mt-0.5">Fiş/dekont fotoğrafı çek</p>
-                        </div>
-                      </button>
-
-                      {/* Gallery Button */}
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex flex-col items-center gap-3 p-5 rounded-2xl border-2 border-dashed border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-400/50 transition-all cursor-pointer group"
-                      >
-                        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/10 group-hover:scale-110 transition-transform">
-                          <ImageIcon size={28} className="text-purple-400" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-white font-bold text-sm">Galeriden Seç</p>
-                          <p className="text-[var(--color-text-variant)] text-[10px] mt-0.5">Mevcut fotoğraf yükle</p>
-                        </div>
-                      </button>
-                    </div>
-
-                    {/* Drag & Drop Area */}
-                    <div
-                      onDragEnter={handleDrag}
-                      onDragLeave={handleDrag}
-                      onDragOver={handleDrag}
-                      onDrop={handleDrop}
-                      className={`border-2 border-dashed rounded-2xl p-4 transition-all text-center ${dragActive
-                          ? 'border-cyan-400 bg-cyan-400/10 scale-[1.02]'
-                          : 'border-white/5 bg-white/[0.02] hover:border-white/15'
-                        }`}
-                    >
-                      <div className="flex items-center justify-center gap-2 text-[var(--color-text-variant)] text-xs">
-                        <Upload size={14} />
-                        <span>veya dosyayı sürükleyip bırakın</span>
-                        <span className="text-white/20">•</span>
-                        <span>JPG, PNG, WEBP</span>
-                        <span className="text-white/20">•</span>
-                        <span>Maks 10MB</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono font-bold text-white text-sm mr-1">{new Intl.NumberFormat('tr-TR').format(item.monthlyAmount)}₺</span>
+                        <button
+                          onClick={() => openEditModal(item)}
+                          className="p-1 rounded-lg text-[var(--color-text-variant)] hover:text-purple-400 hover:bg-purple-500/10 transition-all opacity-0 group-hover/item:opacity-100 focus:opacity-100"
+                          title="Düzenle"
+                        ><Pencil size={12} /></button>
+                        <button
+                          onClick={() => { if (confirm(`"${item.merchant || item.category}" taksitini sil?`)) deleteExpense(item.id); }}
+                          className="p-1 rounded-lg text-[var(--color-text-variant)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/item:opacity-100 focus:opacity-100"
+                          title="Sil"
+                        ><Trash2 size={12} /></button>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="relative z-10 space-y-4">
-                    {/* Image Preview */}
-                    <div className="relative rounded-2xl overflow-hidden border border-white/10">
-                      <img
-                        src={imagePreview}
-                        alt="Fiş önizleme"
-                        className="w-full max-h-[300px] object-contain bg-black/40"
-                      />
-                      <button
-                        onClick={clearImage}
-                        className="absolute top-2 right-2 p-2 bg-black/60 backdrop-blur-sm rounded-xl text-white/80 hover:text-white hover:bg-black/80 transition-all"
-                      >
-                        <X size={16} />
-                      </button>
-                      {selectedImage && (
-                        <div className="absolute bottom-2 left-2 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-lg text-xs text-white/70 flex items-center gap-1.5">
-                          <Receipt size={12} />
-                          {selectedImage.name}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Parsed Preview */}
-                    {parsedPreview && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-[var(--color-surface-lowest)] rounded-2xl p-4 border border-[var(--color-brand-primary)]/20 space-y-3"
-                      >
-                        <div className="flex items-center gap-2 text-[var(--color-brand-primary)] text-sm font-bold">
-                          <CheckCircle2 size={16} />
-                          AI Tarafından Okunan Bilgiler
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <span className="text-[var(--color-text-variant)] text-xs">Tutar</span>
-                            <p className="text-white font-bold font-mono">{new Intl.NumberFormat('tr-TR').format(parsedPreview.amount)} ₺</p>
-                          </div>
-                          <div>
-                            <span className="text-[var(--color-text-variant)] text-xs">Kategori</span>
-                            <p className="text-white font-medium">{CATEGORY_EMOJIS[parsedPreview.category] || '📦'} {parsedPreview.category}</p>
-                          </div>
-                          {parsedPreview.merchant && (
-                            <div className="col-span-2">
-                              <span className="text-[var(--color-text-variant)] text-xs">Mağaza</span>
-                              <p className="text-white font-medium">{parsedPreview.merchant}</p>
-                            </div>
-                          )}
-                          {parsedPreview.items.length > 0 && (
-                            <div className="col-span-2">
-                              <span className="text-[var(--color-text-variant)] text-xs">Ürünler</span>
-                              <div className="flex flex-wrap gap-1.5 mt-1">
-                                {parsedPreview.items.map((item, i) => (
-                                  <span key={i} className="px-2 py-0.5 bg-white/5 rounded-lg text-xs text-white/80">{item}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
-                      {!parsedPreview ? (
-                        <button
-                          onClick={handlePhotoAnalyze}
-                          disabled={isPhotoLoading}
-                          className="flex-1 bg-gradient-to-r from-cyan-600 to-purple-500 text-white rounded-xl px-5 py-3 text-sm font-bold transition-all disabled:opacity-40 flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:scale-[1.01] active:scale-[0.99]"
-                        >
-                          {isPhotoLoading ? (
-                            <>
-                              <Loader2 size={16} className="animate-spin" />
-                              Fiş Okunuyor...
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles size={16} />
-                              AI ile Oku
-                            </>
-                          )}
-                        </button>
-                      ) : (
-                        <>
-                          <button
-                            onClick={clearImage}
-                            className="px-5 py-3 rounded-xl border border-white/10 text-[var(--color-text-variant)] hover:bg-white/5 text-sm font-medium transition-all"
-                          >
-                            İptal
-                          </button>
-                          <button
-                            onClick={handlePhotoConfirm}
-                            disabled={isPhotoLoading}
-                            className="flex-1 bg-gradient-to-r from-[var(--color-brand-primary-container)] to-[var(--color-brand-primary)] text-green-950 rounded-xl px-5 py-3 text-sm font-bold transition-all disabled:opacity-40 flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(78,222,163,0.3)]"
-                          >
-                            {isPhotoLoading ? (
-                              <Loader2 size={16} className="animate-spin" />
-                            ) : (
-                              <CheckCircle2 size={16} />
-                            )}
-                            Onayla ve Kaydet
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {/* Manual Mode */}
-            {inputMode === 'manual' && (
-              <motion.div
-                key="manual"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="bento-card"
-              >
-                <h3 className="text-sm font-bold text-white mb-5 flex items-center gap-2 uppercase tracking-wide font-mono">
-                  <Plus size={18} className="text-[var(--color-brand-secondary)]" /> Manuel Harcama Girişi
-                </h3>
-                <form onSubmit={handleManualSubmit} className="space-y-4">
-                  {/* Amount */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Tutar (₺)</label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        required
-                        value={amount}
-                        onChange={e => setAmount(e.target.value)}
-                        className="w-full px-4 py-3 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors font-mono text-lg pl-10"
-                        placeholder="0"
-                      />
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-variant)]">₺</span>
-                    </div>
-                  </div>
-
-                  {/* Category */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest pl-1 flex items-center gap-2">
-                        <Tag size={12} /> Kategori 
-                        {isSuggestingCategory && <Sparkles size={10} className="text-[#4edeb3] animate-pulse" />}
-                      </label>
-                    </div>
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white focus:outline-none focus:border-[#4edeb3]/50 transition-all appearance-none cursor-pointer"
-                    >
-                      {CREDIT_CARD_CATEGORIES.map(cat => (
-                        <option key={cat} value={cat} className="bg-[#1a1c1e]">{CATEGORY_EMOJIS[cat] || ''} {cat}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Merchant */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                      <Store size={10} className="inline mr-1" /> Mağaza / İşyeri
-                    </label>
-                    <input
-                      type="text"
-                      value={merchant}
-                      onChange={e => setMerchant(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors"
-                      placeholder="Migros, Zara, Trendyol..."
-                    />
-                  </div>
-
-                  {/* Card & Installments Row */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                        <CreditCard size={10} className="inline mr-1" /> Kart
-                      </label>
-                      {cards.length > 0 ? (
-                        <select
-                          value={selectedCardId}
-                          onChange={e => setSelectedCardId(e.target.value)}
-                          className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors text-sm appearance-none"
-                        >
-                          {cards.map(c => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}{c.last_four ? ` (*${c.last_four})` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setShowCardModal(true)}
-                          className="w-full px-4 py-2.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-xl text-sm font-medium hover:bg-purple-500/20 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <PlusCircle size={14} /> Kart Ekle
-                        </button>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                        <Hash size={10} className="inline mr-1" /> Taksit
-                      </label>
-                      <select
-                        value={installments}
-                        onChange={e => setInstallments(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors appearance-none cursor-pointer text-sm"
-                      >
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
-                          <option key={n} value={n}>{n === 1 ? 'Tek Çekim' : `${n} Taksit`}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">Açıklama</label>
-                    <input
-                      type="text"
-                      value={description}
-                      onChange={e => setDescription(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors"
-                      placeholder="Opsiyonel not..."
-                    />
-                  </div>
-
-                  {/* Exempt Toggle */}
-                  <div className="flex items-center justify-between px-4 py-3 bg-[var(--color-surface-lowest)] border border-white/10 rounded-xl">
-                    <label className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">
-                      Muaf (Gider sayılmasın)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsExempt(!isExempt)}
-                      className={`w-10 h-5 rounded-full transition-colors relative ${isExempt ? 'bg-purple-500' : 'bg-white/10'}`}
-                    >
-                      <div className={`absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform ${isExempt ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </button>
-                  </div>
-
-                  {/* Receipt Upload (Optional) */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                      <Receipt size={10} className="inline mr-1" /> Fiş / Dekont (Opsiyonel)
-                    </label>
-                    <label className="flex items-center gap-3 px-4 py-3 bg-[var(--color-surface-lowest)] border border-white/10 rounded-xl cursor-pointer hover:bg-[var(--color-surface-container)] transition-colors">
-                      <Upload size={16} className="text-[var(--color-text-variant)]" />
-                      <span className="text-sm text-[var(--color-text-variant)]">
-                        {manualReceiptFile ? manualReceiptFile.name : 'Fotoğraf seçin...'}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setManualReceiptFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl py-3.5 font-bold hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] transition-all hover:scale-[1.01] active:scale-[0.99]"
-                  >
-                    Kaydet
-                  </button>
-                </form>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Right Panel - Expenses List */}
-        <div className="lg:col-span-2">
-          <div className="bento-card p-0 overflow-hidden flex flex-col h-full">
-            <div className="px-6 py-5 border-b border-white/5 bg-[var(--color-surface-container)] flex items-center justify-between">
-              <h3 className="font-bold text-white uppercase tracking-wider text-sm font-mono flex items-center gap-2">
-                <Receipt size={16} className="text-purple-400" />
-                Harcama Geçmişi
-                {selectedFilter !== 'all' && (
-                  <span className="text-xs normal-case font-normal text-purple-300 ml-1">
-                    ({selectedFilter})
-                  </span>
-                )}
-              </h3>
-              <span className="text-xs text-[var(--color-text-variant)] font-mono">
-                {filteredExpenses.length} kayıt
-              </span>
-            </div>
-
-            {loading ? (
-              <div className="p-12 text-center text-[var(--color-text-variant)] font-mono flex flex-col items-center gap-3">
-                <Loader2 size={24} className="animate-spin text-purple-400" />
-                Veri Senkronize Ediliyor...
-              </div>
-            ) : filteredExpenses.length === 0 ? (
-              <div className="p-12 text-center flex flex-col items-center gap-4">
-                <div className="p-5 rounded-3xl bg-purple-500/5 border border-purple-500/10">
-                  <CreditCard size={40} className="text-purple-400/40" />
-                </div>
-                <div>
-                  <p className="text-white font-medium">Henüz harcama bulunmuyor</p>
-                  <p className="text-[var(--color-text-variant)] text-sm mt-1">
-                    AI ile yazı yazarak veya fiş fotoğrafı çekerek ilk harcamanızı ekleyin
-                  </p>
+                  ))}
                 </div>
               </div>
-            ) : (
-              <ul className="divide-y divide-white/5 max-h-[700px] overflow-y-auto">
-                {filteredExpenses.map((expense, idx) => (
-                  <li
-                    key={expense.id}
-                    className={`p-4 md:p-5 hover:bg-[var(--color-surface-container)] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group ${idx % 2 === 0 ? 'bg-[var(--color-surface-lowest)]' : 'bg-transparent'}`}
-                  >
-                    <div className="flex items-center gap-4 md:gap-5 min-w-0">
-                      {/* Category Icon */}
-                      <div
-                        className="p-2.5 rounded-2xl shrink-0 text-lg"
-                        style={{
-                          backgroundColor: `${CATEGORY_COLORS[expense.category] || '#94a3b8'}15`,
-                        }}
-                      >
-                        {CATEGORY_EMOJIS[expense.category] || '📦'}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-bold text-white text-base">{expense.merchant || expense.category}</p>
-                          {expense.installments > 1 && (
-                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/10">
-                              {expense.installments} Taksit
-                            </span>
-                          )}
-                          {expense.receipt_url && (
-                            <button
-                              onClick={() => setPreviewReceiptUrl(expense.receipt_url)}
-                              className="p-1 rounded-lg hover:bg-white/10 transition-colors"
-                              title="Fişi Görüntüle"
-                            >
-                              <Eye size={14} className="text-cyan-400" />
-                            </button>
-                          )}
-                          {expense.is_exempt && (
-                            <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-white/40 text-[7px] font-black uppercase tracking-tighter rounded-full ml-1">
-                              MUAF
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-[var(--color-text-variant)] mt-1 font-mono flex-wrap">
-                          <span>{expense.date}</span>
-                          {expense.card_name && (
-                            <>
-                              <span className="text-white/20 hidden sm:inline">•</span>
-                              <span className="flex items-center gap-1">
-                                <CreditCard size={10} /> {expense.card_name}
-                              </span>
-                            </>
-                          )}
-                          {expense.merchant && expense.category && (
-                            <>
-                              <span className="text-white/20 hidden sm:inline">•</span>
-                              <span style={{ color: CATEGORY_COLORS[expense.category] || '#94a3b8' }}>{expense.category}</span>
-                            </>
-                          )}
-                          {expense.description && (
-                            <>
-                              <span className="text-white/20 hidden sm:inline">•</span>
-                              <span className="truncate max-w-[180px] block sm:inline">{expense.description}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-5 w-full sm:w-auto mt-2 sm:mt-0 shrink-0">
-                      <span className="font-black font-mono text-lg text-white">
-                        -{new Intl.NumberFormat('tr-TR').format(expense.amount)} <span className="text-[var(--color-brand-tertiary)]">₺</span>
-                      </span>
-                      <button
-                        onClick={() => deleteExpense(expense.id)}
-                        className="p-2.5 text-[#ff7886] bg-[#ffb4ab]/10 lg:bg-transparent lg:text-[var(--color-text-variant)] lg:hover:text-[#ff7886] lg:hover:bg-[#ffb4ab]/10 rounded-xl transition-all opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
             )}
+            {/* All installments compact */}
+            <div className="divide-y divide-white/5">
+              {installmentExpenses.map(expense => {
+                const monthlyAmount = expense.amount / expense.installments;
+                const expDate = new Date(expense.date);
+                const now2 = new Date();
+                const mp = Math.max(1, (now2.getFullYear() - expDate.getFullYear()) * 12 + (now2.getMonth() - expDate.getMonth()) + 1);
+                const paid = Math.min(mp, expense.installments);
+                const remaining = expense.installments - paid;
+                const isCompleted = remaining <= 0;
+                return (
+                  <div key={expense.id}
+                    className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03] group ${isCompleted ? 'opacity-50' : ''}`}
+                  >
+                    <span className="text-base shrink-0">{CATEGORY_EMOJIS[expense.category] || '📦'}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-semibold text-white truncate">{expense.merchant || expense.category}</p>
+                        <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                          isCompleted ? 'bg-green-500/15 text-green-400' : 'bg-purple-500/15 text-purple-300'
+                        }`}>{isCompleted ? '✓ Bitti' : `${paid}/${expense.installments}`}</span>
+                      </div>
+                      <div className="mt-1 h-0.5 rounded-full bg-white/10 overflow-hidden w-full max-w-[100px]">
+                        <div className={`h-full rounded-full ${isCompleted ? 'bg-green-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}
+                          style={{ width: `${(paid / expense.installments) * 100}%` }} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <div className="text-right mr-1">
+                        <p className="text-sm font-bold text-white font-mono">{new Intl.NumberFormat('tr-TR').format(monthlyAmount)}₺<span className="text-[10px] text-[var(--color-text-variant)]">/ay</span></p>
+                        {!isCompleted && <p className="text-[10px] text-[var(--color-text-variant)] font-mono">{remaining} kaldı</p>}
+                      </div>
+                      <button
+                        onClick={() => openEditModal(expense)}
+                        className="p-1.5 rounded-lg text-[var(--color-text-variant)] hover:text-purple-400 hover:bg-purple-500/10 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title="Düzenle"
+                      ><Pencil size={13} /></button>
+                      <button
+                        onClick={() => { if (confirm(`"${expense.merchant || expense.category}" taksitini sil?`)) deleteExpense(expense.id); }}
+                        className="p-1.5 rounded-lg text-[var(--color-text-variant)] hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title="Sil"
+                      ><Trash2 size={13} /></button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
-      {/* Taksit Yönetici (Enhanced Installments Section) */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl space-y-6 mt-8">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/20">
-              <List size={22} className="text-purple-400" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">Taksit Yönetici</h2>
-              <p className="text-xs text-[var(--color-text-variant)]">
-                {installmentExpenses.length} aktif taksitli işleminiz var
-              </p>
-            </div>
+      {/* ── Category chips ── */}
+      {sortedCategories.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
+          {sortedCategories.map(([cat, total]) => (
+            <button key={cat}
+              onClick={() => setSelectedFilter(selectedFilter === cat ? 'all' : cat)}
+              className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all text-xs font-medium ${
+                selectedFilter === cat ? 'bg-white/10 border-white/20 text-white' : 'border-white/8 text-[var(--color-text-variant)] hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <span>{CATEGORY_EMOJIS[cat] || '📦'}</span>
+              <span>{cat}</span>
+              <span className="font-mono opacity-60">{new Intl.NumberFormat('tr-TR', { notation: 'compact' }).format(total as number)}₺</span>
+            </button>
+          ))}
+          {selectedFilter !== 'all' && (
+            <button onClick={() => setSelectedFilter('all')}
+              className="shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs text-[var(--color-brand-tertiary)] hover:bg-white/5 transition-all"
+            ><X size={11} /> Tümü</button>
+          )}
+        </div>
+      )}
+
+      {/* ── Expense history list ── */}
+      <div className="bento-card p-0 overflow-hidden">
+        <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+          <span className="text-xs font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono flex items-center gap-1.5">
+            <Receipt size={12} className="text-purple-400" /> Harcama Geçmişi
+            {selectedFilter !== 'all' && <span className="text-purple-300">({selectedFilter})</span>}
+          </span>
+          <span className="text-[10px] text-[var(--color-text-variant)] font-mono">{filteredExpenses.length} kayıt · {new Intl.NumberFormat('tr-TR').format(filteredTotalExpenses)}₺</span>
+        </div>
+        {loading ? (
+          <div className="py-12 flex items-center justify-center gap-3 text-[var(--color-text-variant)] text-sm">
+            <Loader2 size={18} className="animate-spin text-purple-400" /> Yükleniyor…
           </div>
-        </div>
-
-        {installmentExpenses.length === 0 ? (
-          <div className="p-12 text-center flex flex-col items-center gap-4 bg-white/[0.02] rounded-2xl border border-white/5">
-            <div className="p-5 rounded-3xl bg-purple-500/5 border border-purple-500/10">
-              <List size={40} className="text-purple-400/40" />
-            </div>
-            <div>
-              <p className="text-white font-medium">Henüz taksitli işlem yok</p>
-              <p className="text-[var(--color-text-variant)] text-sm mt-1">
-                Taksitli harcama girdiğinizde burada görünecek
-              </p>
-            </div>
+        ) : filteredExpenses.length === 0 ? (
+          <div className="py-10 flex flex-col items-center gap-3 text-[var(--color-text-variant)]">
+            <CreditCard size={28} className="opacity-20" />
+            <p className="text-sm">Henüz harcama yok</p>
+            <button onClick={() => setShowAddExpenseModal(true)}
+              className="text-xs text-purple-400 hover:text-purple-300 underline underline-offset-2 transition-colors"
+            >Harcama ekle →</button>
           </div>
         ) : (
-          <>
-            {/* Current Month Installment Summary */}
-            {(() => {
-              const totalInstallmentAmount = installmentExpenses.reduce((sum, e) => sum + e.amount, 0);
-              const monthlyInstallmentAmount = installmentExpenses.reduce((sum, e) => sum + (e.amount / e.installments), 0);
-              const now = new Date();
-              const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-              const currentMonthData = futureMonthlyInstallments.find(m => m.key === currentMonthKey);
-              const currentMonthTotal = currentMonthData?.total || 0;
-              const currentMonthItems = currentMonthData?.items || [];
-              
-              return (
-                <div className="space-y-4">
-                  {/* Stats Row */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="p-4 rounded-2xl bg-purple-500/5 border border-purple-500/10 flex flex-col justify-center">
-                      <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Toplam Taksitli</p>
-                      <p className="text-xl font-black text-white font-mono mt-1">
-                        {new Intl.NumberFormat('tr-TR').format(totalInstallmentAmount)} <span className="text-purple-400 text-sm">₺</span>
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-2xl bg-pink-500/5 border border-pink-500/10 flex flex-col justify-center">
-                      <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Aylık Yük</p>
-                      <p className="text-xl font-black text-white font-mono mt-1">
-                        {new Intl.NumberFormat('tr-TR').format(monthlyInstallmentAmount)} <span className="text-pink-400 text-sm">₺</span>
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex flex-col justify-center">
-                      <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Bu Ay Taksit</p>
-                      <p className="text-xl font-black text-white font-mono mt-1">
-                        {new Intl.NumberFormat('tr-TR').format(currentMonthTotal)} <span className="text-amber-400 text-sm">₺</span>
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-2xl bg-[var(--color-brand-primary)]/5 border border-[var(--color-brand-primary)]/10 flex flex-col justify-center">
-                      <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono">Aktif İşlem</p>
-                      <p className="text-xl font-black text-white font-mono mt-1">
-                        {installmentExpenses.filter(e => {
-                          const d = new Date(e.date);
-                          const mp = Math.max(1, (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth()) + 1);
-                          return mp < e.installments;
-                        }).length} <span className="text-[var(--color-brand-primary)] text-sm">adet</span>
-                      </p>
-                    </div>
+          <ul className="divide-y divide-white/5 max-h-[500px] overflow-y-auto">
+            {filteredExpenses.map(expense => (
+              <li key={expense.id}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors group"
+              >
+                <div className="p-2 rounded-xl shrink-0 text-base"
+                  style={{ backgroundColor: `${CATEGORY_COLORS[expense.category] || '#94a3b8'}15` }}
+                >{CATEGORY_EMOJIS[expense.category] || '📦'}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="font-semibold text-white text-sm">{expense.merchant || expense.category}</p>
+                    {expense.installments > 1 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/10 font-bold">{expense.installments}T</span>
+                    )}
+                    {expense.is_exempt && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/40 font-black uppercase">MUAF</span>}
+                    {expense.receipt_url && (
+                      <button onClick={() => setPreviewReceiptUrl(expense.receipt_url)}
+                        className="p-0.5 rounded hover:bg-white/10 transition-colors"
+                      ><Eye size={12} className="text-cyan-400" /></button>
+                    )}
                   </div>
-
-                  {/* This Month Quick Actions */}
-                  {currentMonthItems.length > 0 && (
-                    <div className="bg-gradient-to-r from-amber-500/5 to-orange-500/5 rounded-2xl border border-amber-500/15 p-5 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Clock size={16} className="text-amber-400" />
-                          <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                            Bu Ay Ödenecek Taksitler
-                          </h3>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold font-mono border border-amber-500/20">
-                            {currentMonthItems.length} işlem
-                          </span>
-                        </div>
-                        <span className="text-lg font-black text-amber-400 font-mono">
-                          {new Intl.NumberFormat('tr-TR').format(currentMonthTotal)} ₺
-                        </span>
-                      </div>
-
-                      <div className="space-y-2">
-                        {currentMonthItems.map((item: any) => (
-                          <div key={`curr-${item.id}`} className="flex items-center justify-between p-3 rounded-xl bg-black/20 border border-white/5 hover:border-amber-500/20 transition-all group">
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg">{CATEGORY_EMOJIS[item.category] || '📦'}</span>
-                              <div>
-                                <p className="text-sm font-bold text-white">{item.merchant || item.category}</p>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/10">
-                                    {item.currentInstallmentNumber}/{item.installments}
-                                  </span>
-                                  {item.card_name && (
-                                    <span className="text-[10px] text-[var(--color-text-variant)] flex items-center gap-1 font-mono">
-                                      <CreditCard size={8} /> {item.card_name}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <span className="font-mono font-black text-white">
-                              {new Intl.NumberFormat('tr-TR').format(item.monthlyAmount)} <span className="text-xs text-amber-400">₺</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* All Installments List */}
-            <div className="space-y-4 mt-6">
-              <h3 className="text-xs font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono flex items-center gap-2">
-                <List size={14} /> Tüm Taksitli İşlemler
-              </h3>
-              {Object.entries(installmentGroups).map(([groupKey, group]: [string, any]) => (
-                <div key={groupKey} className="space-y-3">
-                  <div className="flex items-center gap-2 px-1">
-                    <CreditCard size={13} className="text-purple-300" />
-                    <p className="text-sm font-semibold text-purple-200">{group.cardName}</p>
-                    <span className="text-[10px] text-[var(--color-text-variant)] font-mono">
-                      ({group.items.length} işlem)
-                    </span>
+                  <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-variant)] mt-0.5 font-mono">
+                    <span>{expense.date}</span>
+                    {expense.card_name && <><span className="opacity-30">·</span><span>{expense.card_name}</span></>}
+                    {expense.merchant && expense.category && <span style={{ color: CATEGORY_COLORS[expense.category] }}>{expense.category}</span>}
                   </div>
-                  {group.items.map((expense: any) => {
-                    const monthlyAmount = expense.amount / expense.installments;
-                    const expenseDate = new Date(expense.date);
-                    const now = new Date();
-                    const monthsPassed = Math.max(1, (now.getFullYear() - expenseDate.getFullYear()) * 12 + (now.getMonth() - expenseDate.getMonth()) + 1);
-                    const paidInstallments = Math.min(monthsPassed, expense.installments);
-                    const remainingInstallments = expense.installments - paidInstallments;
-                    const progressPercent = (paidInstallments / expense.installments) * 100;
-                    const isCompleted = remainingInstallments <= 0;
-
-                    return (
-                      <div
-                        key={expense.id}
-                        className={`p-5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-purple-500/20 hover:bg-white/[0.04] transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isCompleted ? 'opacity-60 grayscale' : ''}`}
-                      >
-                        <div className="flex items-start gap-4">
-                          <div
-                            className="p-3 rounded-2xl shrink-0 text-xl"
-                            style={{
-                              backgroundColor: `${CATEGORY_COLORS[expense.category] || '#94a3b8'}15`,
-                            }}
-                          >
-                            {CATEGORY_EMOJIS[expense.category] || '📦'}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-bold text-white text-base">{expense.merchant || expense.category}</p>
-                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg ${isCompleted ? 'bg-green-500/15 text-green-400 border border-green-500/10' : 'bg-purple-500/15 text-purple-300 border border-purple-500/10'}`}>
-                                {isCompleted ? '✓ Tamamlandı' : `${paidInstallments}/${expense.installments} Taksit`}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-[var(--color-text-variant)] mt-1 font-mono flex-wrap">
-                              <span className="flex items-center gap-1">
-                                <Calendar size={10} />
-                                {expense.date}
-                              </span>
-                              {expense.card_name && (
-                                <>
-                                  <span className="text-white/20">•</span>
-                                  <span className="flex items-center gap-1">
-                                    <CreditCard size={10} />
-                                    {expense.card_name}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-
-                            <div className="mt-3 max-w-[200px] w-full">
-                              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full ${isCompleted ? 'bg-green-500' : 'bg-gradient-to-r from-purple-500 to-pink-500'}`}
-                                  style={{ width: `${progressPercent}%` }}
-                                />
-                              </div>
-                              <div className="flex justify-between mt-1 text-[10px] text-[var(--color-text-variant)] font-mono">
-                                <span>{paidInstallments} ödendi</span>
-                                <span>{remainingInstallments > 0 ? `${remainingInstallments} kaldı` : 'Bitti'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="text-left md:text-right w-full md:w-auto">
-                          <p className="text-xl font-black font-mono text-white">
-                            {new Intl.NumberFormat('tr-TR').format(expense.amount)} <span className="text-[var(--color-brand-tertiary)] text-sm">₺</span>
-                          </p>
-                          <p className="text-xs text-pink-400 font-mono mt-0.5 flex items-center md:justify-end gap-1">
-                            <Clock size={10} />
-                            Aylık: {new Intl.NumberFormat('tr-TR').format(monthlyAmount)} ₺
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
-              ))}
-            </div>
-          </>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="font-black font-mono text-white text-base">-{new Intl.NumberFormat('tr-TR').format(expense.amount)}<span className="text-[var(--color-brand-tertiary)] text-sm">₺</span></span>
+                  <button onClick={() => deleteExpense(expense.id)}
+                    className="p-1.5 text-red-400/40 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  ><Trash2 size={14} /></button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
-      {/* Page Footer Actions */}
-      <div className="flex justify-center mt-8 mb-12">
-        <button
-          onClick={() => setShowInstallmentsModal(true)}
-          className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 text-white font-bold hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(168,85,247,0.2)] transition-all group shadow-lg"
-        >
-          <div className="p-2 rounded-xl bg-purple-500/20 group-hover:bg-purple-500/30 transition-colors">
-            <Calendar size={20} className="text-purple-400" />
-          </div>
-          <span>Gelecek Taksitleri Ay Ay Gör</span>
-          <ArrowRight size={18} className="text-purple-400 group-hover:translate-x-1 transition-transform" />
-        </button>
-      </div>
+      {/* ── MODALS ── */}
 
-      {/* Receipt Preview Modal */}
+      {/* ── Edit Expense Modal ── */}
       <AnimatePresence>
-        {previewReceiptUrl && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setPreviewReceiptUrl(null)}
+        {editingExpense && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setEditingExpense(null)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative max-w-2xl max-h-[85vh] rounded-2xl overflow-hidden border border-white/10"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="bg-[var(--color-surface-container)] rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md border border-white/10 shadow-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
             >
-              <img
-                src={previewReceiptUrl}
-                alt="Fiş / Dekont"
-                className="w-full h-full object-contain"
-              />
-              <button
-                onClick={() => setPreviewReceiptUrl(null)}
-                className="absolute top-3 right-3 p-2.5 bg-black/60 backdrop-blur-sm rounded-xl text-white hover:bg-black/80 transition-all"
-              >
-                <X size={18} />
-              </button>
+              <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-purple-500/15 border border-purple-500/20"><Pencil size={15} className="text-purple-400" /></div>
+                  <div>
+                    <h3 className="font-bold text-white">Harcamayı Düzenle</h3>
+                    <p className="text-xs text-[var(--color-text-variant)] truncate max-w-[200px]">{editingExpense.merchant || editingExpense.category}</p>
+                  </div>
+                </div>
+                <button onClick={() => setEditingExpense(null)} className="p-1.5 rounded-lg bg-white/5 text-[var(--color-text-variant)] hover:text-white hover:bg-white/10"><X size={16} /></button>
+              </div>
+              <form onSubmit={handleEditSave} className="p-5 space-y-3">
+                {/* Amount */}
+                <div className="relative">
+                  <input type="number" required value={editAmount} onChange={e => setEditAmount(e.target.value)}
+                    className="w-full pl-7 pr-3 py-3 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 font-mono text-xl"
+                    placeholder="0" step="0.01"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-variant)] text-lg">₺</span>
+                </div>
+                {/* Category */}
+                <select value={editCategory} onChange={e => setEditCategory(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm appearance-none"
+                >{CREDIT_CARD_CATEGORIES.map(cat => <option key={cat} value={cat} className="bg-[#1a1c1e]">{CATEGORY_EMOJIS[cat]} {cat}</option>)}</select>
+                {/* Merchant + Description */}
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="text" value={editMerchant} onChange={e => setEditMerchant(e.target.value)}
+                    className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                    placeholder="Mağaza"
+                  />
+                  <input type="text" value={editDescription} onChange={e => setEditDescription(e.target.value)}
+                    className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                    placeholder="Not (opsiyonel)"
+                  />
+                </div>
+                {/* Card + Installments */}
+                <div className="grid grid-cols-2 gap-2">
+                  {cards.length > 0 && (
+                    <select value={editCardId} onChange={e => setEditCardId(e.target.value)}
+                      className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm appearance-none"
+                    >{cards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                  )}
+                  <select value={editInstallments} onChange={e => setEditInstallments(e.target.value)}
+                    className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm appearance-none"
+                  >{[1,2,3,4,5,6,7,8,9,10,11,12,18,24,36].map(n => <option key={n} value={n}>{n === 1 ? 'Tek Çekim' : `${n} Taksit`}</option>)}</select>
+                </div>
+                {/* Preview */}
+                {editAmount && parseFloat(editAmount) > 0 && parseInt(editInstallments) > 1 && (
+                  <div className="px-3 py-2 bg-purple-500/5 border border-purple-500/15 rounded-xl text-xs font-mono text-purple-300">
+                    Aylık: {new Intl.NumberFormat('tr-TR').format(parseFloat(editAmount) / parseInt(editInstallments))} ₺
+                    · {parseInt(editInstallments)} taksit
+                  </div>
+                )}
+                {/* Actions */}
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => setEditingExpense(null)}
+                    className="px-4 py-2.5 rounded-xl border border-white/10 text-[var(--color-text-variant)] text-sm hover:bg-white/5 transition-colors"
+                  >İptal</button>
+                  <button type="submit" disabled={isEditSaving}
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl py-2.5 font-bold text-sm disabled:opacity-40 flex items-center justify-center gap-2 hover:brightness-110 transition-all"
+                  >{isEditSaving ? <><Loader2 size={14} className="animate-spin" /> Kaydediliyor…</> : <><Pencil size={14} /> Kaydet</>}</button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Card Management Modal */}
-      {showCardModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowCardModal(false)}>
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-[var(--color-surface-container)] rounded-3xl w-full max-w-md border border-white/10 shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+      {/* ── Add Expense Modal ── */}
+      <AnimatePresence>
+        {showAddExpenseModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setShowAddExpenseModal(false)}
           >
-            <div className="p-5 border-b border-white/5 bg-gradient-to-r from-purple-500/10 to-pink-500/10 flex justify-between items-center">
-              <h3 className="font-bold text-white flex items-center gap-2 text-lg">
-                <CreditCard size={20} className="text-purple-400" /> Yeni Kart Ekle
-              </h3>
-              <button onClick={() => setShowCardModal(false)} className="text-[var(--color-text-variant)] hover:text-white transition-colors bg-white/5 p-1.5 rounded-lg hover:bg-white/10">
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddCard} className="p-5 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                  Kart Adı <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newCardName}
-                  onChange={e => setNewCardName(e.target.value)}
-                  placeholder="Örn: Bonus, Maximum, World..."
-                  className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors text-sm"
-                />
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="bg-[var(--color-surface-container)] rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg border border-white/10 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
+                <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+                  {([['ai-text', 'AI Yazı'], ['ai-photo', 'Fiş'], ['manual', 'Manuel']] as const).map(([mode, label]) => (
+                    <button key={mode} onClick={() => setInputMode(mode as InputMode)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        inputMode === mode ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow' : 'text-[var(--color-text-variant)] hover:text-white'
+                      }`}
+                    >
+                      {mode === 'ai-text' && <Sparkles size={12} />}
+                      {mode === 'ai-photo' && <Camera size={12} />}
+                      {mode === 'manual' && <Plus size={12} />}
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setShowAddExpenseModal(false)}
+                  className="p-1.5 rounded-lg bg-white/5 text-[var(--color-text-variant)] hover:text-white hover:bg-white/10 transition-colors"
+                ><X size={16} /></button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                    Banka
-                  </label>
-                  <input
-                    type="text"
-                    value={newCardBank}
-                    onChange={e => setNewCardBank(e.target.value)}
-                    placeholder="Garanti, Yapıkredi..."
-                    className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                    Son 4 Hane
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={4}
-                    value={newCardLastFour}
-                    onChange={e => setNewCardLastFour(e.target.value.replace(/\D/g, ''))}
-                    placeholder="1234"
-                    className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors text-sm font-mono"
-                  />
-                </div>
-              </div>
+              {/* Modal body */}
+              <div className="overflow-y-auto flex-1">
+                <AnimatePresence mode="wait">
+                  {/* AI Text */}
+                  {inputMode === 'ai-text' && (
+                    <motion.div key="ai-text" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}
+                      className="p-5 space-y-3"
+                    >
+                      {cards.length > 0 && (
+                        <select value={selectedCardId} onChange={e => setSelectedCardId(e.target.value)}
+                          className="w-full px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm appearance-none"
+                        >{cards.map(c => <option key={c.id} value={c.id}>💳 {c.name}{c.last_four ? ` (*${c.last_four})` : ''}</option>)}</select>
+                      )}
+                      <form onSubmit={handleAiTextSubmit} className="relative">
+                        <textarea value={aiInput} onChange={e => setAiInput(e.target.value)}
+                          placeholder="Migros'tan 850₺ market alışverişi, 3 taksit…"
+                          className="w-full px-4 py-3 bg-[var(--color-surface-lowest)] border border-white/10 rounded-xl outline-none focus:border-purple-500/50 resize-none pb-14 text-sm text-white placeholder-white/30"
+                          rows={4} autoFocus
+                        />
+                        <button type="submit" disabled={isAiLoading || !aiInput.trim()}
+                          className="absolute bottom-2.5 right-2.5 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-lg px-4 py-2 text-xs font-bold transition-all disabled:opacity-40 flex items-center gap-1.5 hover:brightness-110"
+                        >{isAiLoading ? <><Loader2 size={12} className="animate-spin" /> Çözümleniyor…</> : <><Sparkles size={12} /> Ekle</>}</button>
+                      </form>
+                    </motion.div>
+                  )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                    Son Ödeme Günü <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    max="31"
-                    value={newCardPaymentDay}
-                    onChange={e => setNewCardPaymentDay(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                    Hesap Kesim Günü
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={newCardCutOffDay}
-                    onChange={e => setNewCardCutOffDay(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors text-sm"
-                  />
-                </div>
-              </div>
+                  {/* AI Photo */}
+                  {inputMode === 'ai-photo' && (
+                    <motion.div key="ai-photo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}
+                      className="p-5 space-y-3"
+                    >
+                      <input ref={fileInputRef} type="file" accept="image/*" onChange={e => e.target.files?.[0] && handleImageSelect(e.target.files[0])} className="hidden" />
+                      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={e => e.target.files?.[0] && handleImageSelect(e.target.files[0])} className="hidden" />
+                      {cards.length > 0 && (
+                        <select value={selectedCardId} onChange={e => setSelectedCardId(e.target.value)}
+                          className="w-full px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-cyan-500/50 text-sm appearance-none"
+                        >{cards.map(c => <option key={c.id} value={c.id}>💳 {c.name}{c.last_four ? ` (*${c.last_four})` : ''}</option>)}</select>
+                      )}
+                      {!imagePreview ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button type="button" onClick={() => cameraInputRef.current?.click()}
+                              className="flex items-center justify-center gap-2 p-5 rounded-xl border border-dashed border-cyan-500/25 bg-cyan-500/5 hover:bg-cyan-500/10 transition-all text-sm font-medium text-cyan-300"
+                            ><Camera size={18} /> Kamera</button>
+                            <button type="button" onClick={() => fileInputRef.current?.click()}
+                              className="flex items-center justify-center gap-2 p-5 rounded-xl border border-dashed border-purple-500/25 bg-purple-500/5 hover:bg-purple-500/10 transition-all text-sm font-medium text-purple-300"
+                            ><ImageIcon size={18} /> Galeri</button>
+                          </div>
+                          <div onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
+                            className={`border border-dashed rounded-xl py-3 px-4 flex items-center justify-center gap-2 text-xs text-[var(--color-text-variant)] transition-all ${
+                              dragActive ? 'border-cyan-400 bg-cyan-400/8' : 'border-white/8 hover:border-white/15'
+                            }`}
+                          ><Upload size={12} /> Sürükle & bırak · JPG, PNG, WEBP</div>
+                        </>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="relative rounded-xl overflow-hidden border border-white/10">
+                            <img src={imagePreview} alt="Fiş" className="w-full max-h-[200px] object-contain bg-black/40" />
+                            <button onClick={clearImage} className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-lg text-white/80 hover:text-white hover:bg-black/80"><X size={14} /></button>
+                          </div>
+                          {parsedPreview && (
+                            <div className="bg-[var(--color-surface-lowest)] rounded-xl p-3 border border-[var(--color-brand-primary)]/20 space-y-2">
+                              <div className="flex items-center gap-1.5 text-[var(--color-brand-primary)] text-xs font-bold"><CheckCircle2 size={13} /> AI Okudu</div>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div><span className="text-[var(--color-text-variant)]">Tutar</span><p className="text-white font-bold font-mono">{new Intl.NumberFormat('tr-TR').format(parsedPreview.amount)}₺</p></div>
+                                <div><span className="text-[var(--color-text-variant)]">Kategori</span><p className="text-white">{CATEGORY_EMOJIS[parsedPreview.category]} {parsedPreview.category}</p></div>
+                                {parsedPreview.merchant && <div className="col-span-2"><span className="text-[var(--color-text-variant)]">Mağaza</span><p className="text-white">{parsedPreview.merchant}</p></div>}
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            {!parsedPreview ? (
+                              <button onClick={handlePhotoAnalyze} disabled={isPhotoLoading}
+                                className="flex-1 bg-gradient-to-r from-cyan-600 to-purple-500 text-white rounded-xl py-3 text-sm font-bold disabled:opacity-40 flex items-center justify-center gap-2"
+                              >{isPhotoLoading ? <><Loader2 size={14} className="animate-spin" /> Okunuyor…</> : <><Sparkles size={14} /> AI ile Oku</>}</button>
+                            ) : (
+                              <>
+                                <button onClick={clearImage} className="px-4 py-3 rounded-xl border border-white/10 text-[var(--color-text-variant)] text-sm hover:bg-white/5">İptal</button>
+                                <button onClick={handlePhotoConfirm} disabled={isPhotoLoading}
+                                  className="flex-1 bg-gradient-to-r from-[var(--color-brand-primary-container)] to-[var(--color-brand-primary)] text-green-950 rounded-xl py-3 text-sm font-bold disabled:opacity-40 flex items-center justify-center gap-2"
+                                >{isPhotoLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Onayla & Kaydet</button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                    Kart Limiti (₺)
-                  </label>
-                  <input
-                    type="number"
-                    step="100"
-                    value={newCardLimit}
-                    onChange={e => setNewCardLimit(e.target.value)}
-                    placeholder="50000"
-                    className="w-full px-4 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 transition-colors text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest mb-1.5 font-mono">
-                    Kart Rengi
-                  </label>
-                  <div className="flex gap-2">
-                    {['#a855f7', '#06b6d4', '#f97316', '#ef4444', '#22c55e', '#3b82f6', '#eab308', '#ec4899'].map(c => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setNewCardColor(c)}
-                        className={`w-7 h-7 rounded-full transition-all ${newCardColor === c ? 'ring-2 ring-offset-2 ring-offset-[var(--color-surface-container)] scale-110' : 'hover:scale-110'}`}
-                        style={{ backgroundColor: c, ringColor: c }}
-                      />
-                    ))}
+                  {/* Manual */}
+                  {inputMode === 'manual' && (
+                    <motion.div key="manual" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}
+                      className="p-5"
+                    >
+                      <form onSubmit={handleManualSubmit} className="space-y-3">
+                        <div className="relative">
+                          <input type="number" required value={amount} onChange={e => setAmount(e.target.value)}
+                            className="w-full px-4 py-3 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 font-mono text-xl pl-8"
+                            placeholder="0" autoFocus
+                          />
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-variant)] text-lg">₺</span>
+                        </div>
+                        <select value={category} onChange={e => setCategory(e.target.value)}
+                          className="w-full px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm appearance-none"
+                        >{CREDIT_CARD_CATEGORIES.map(cat => <option key={cat} value={cat} className="bg-[#1a1c1e]">{CATEGORY_EMOJIS[cat]} {cat}</option>)}</select>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input type="text" value={merchant} onChange={e => setMerchant(e.target.value)}
+                            className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                            placeholder="Mağaza (opsiyonel)"
+                          />
+                          <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+                            className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                            placeholder="Not (opsiyonel)"
+                          />
+                          {cards.length > 0 ? (
+                            <select value={selectedCardId} onChange={e => setSelectedCardId(e.target.value)}
+                              className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm appearance-none"
+                            >{cards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                          ) : (
+                            <button type="button" onClick={() => setShowCardModal(true)}
+                              className="px-3 py-2.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-xl text-sm flex items-center gap-1.5"
+                            ><PlusCircle size={13} /> Kart Ekle</button>
+                          )}
+                          <select value={installments} onChange={e => setInstallments(e.target.value)}
+                            className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm appearance-none"
+                          >{[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <option key={n} value={n}>{n === 1 ? 'Tek Çekim' : `${n} Taksit`}</option>)}</select>
+                        </div>
+                        <div className="flex items-center justify-between px-3 py-2.5 bg-[var(--color-surface-lowest)] border border-white/10 rounded-xl">
+                          <span className="text-xs text-[var(--color-text-variant)]">Muaf (Gider sayılmasın)</span>
+                          <button type="button" onClick={() => setIsExempt(!isExempt)}
+                            className={`w-9 h-5 rounded-full relative transition-colors ${isExempt ? 'bg-purple-500' : 'bg-white/10'}`}
+                          ><div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${isExempt ? 'translate-x-4' : ''}`} /></button>
+                        </div>
+                        <label className="flex items-center gap-2 px-3 py-2.5 bg-[var(--color-surface-lowest)] border border-white/10 rounded-xl cursor-pointer hover:bg-white/5">
+                          <Upload size={13} className="text-[var(--color-text-variant)]" />
+                          <span className="text-xs text-[var(--color-text-variant)]">{manualReceiptFile ? manualReceiptFile.name : 'Fiş fotoğrafı (opsiyonel)'}</span>
+                          <input type="file" accept="image/*" onChange={e => setManualReceiptFile(e.target.files?.[0] || null)} className="hidden" />
+                        </label>
+                        <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl py-3 font-bold hover:brightness-110 transition-all">Kaydet</button>
+                      </form>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Quick Import Installment Modal ── */}
+      <AnimatePresence>
+        {showQuickInstallModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center p-4"
+            onClick={() => setShowQuickInstallModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-[var(--color-surface-container)] rounded-3xl w-full max-w-md border border-white/10 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-white/5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/20">
+                    <Clock size={18} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white">Mevcut Taksit Aktar</h3>
+                    <p className="text-xs text-[var(--color-text-variant)]">Dışarıdan gelen taksiti sisteme al</p>
                   </div>
                 </div>
+                <button onClick={() => setShowQuickInstallModal(false)} className="p-1.5 rounded-lg bg-white/5 text-[var(--color-text-variant)] hover:text-white hover:bg-white/10"><X size={16} /></button>
               </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl font-bold text-sm hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] transition-all flex items-center justify-center gap-2"
-              >
-                <PlusCircle size={16} /> Kartı Kaydet
-              </button>
-            </form>
+              <div className="overflow-y-auto flex-1 p-5">
+                <form onSubmit={handleQuickInstallSubmit} className="space-y-3">
+                  <input type="text" required value={qiMerchant} onChange={e => setQiMerchant(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-amber-500/50 text-sm"
+                    placeholder="Mağaza / Ürün adı" autoFocus
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      <input type="number" required value={qiAmount} onChange={e => setQiAmount(e.target.value)}
+                        className="w-full pl-6 pr-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-amber-500/50 text-sm font-mono"
+                        placeholder="Toplam tutar"
+                      />
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-variant)] text-sm">₺</span>
+                    </div>
+                    <select value={qiTotalInstallments} onChange={e => setQiTotalInstallments(e.target.value)}
+                      className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-amber-500/50 text-sm appearance-none"
+                    >{[2,3,4,5,6,7,8,9,10,11,12,18,24,36].map(n => <option key={n} value={n}>{n} Taksit</option>)}</select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-[var(--color-text-variant)] font-mono uppercase mb-1 block">Şu anki taksit no</label>
+                      <select value={qiCurrentInstallment} onChange={e => setQiCurrentInstallment(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-amber-500/50 text-sm appearance-none"
+                      >{Array.from({ length: parseInt(qiTotalInstallments) || 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. taksit</option>)}</select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-[var(--color-text-variant)] font-mono uppercase mb-1 block">Kategori</label>
+                      <select value={qiCategory} onChange={e => setQiCategory(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-amber-500/50 text-sm appearance-none"
+                      >{CREDIT_CARD_CATEGORIES.map(cat => <option key={cat} value={cat} className="bg-[#1a1c1e]">{CATEGORY_EMOJIS[cat]} {cat}</option>)}</select>
+                    </div>
+                  </div>
+                  {cards.length > 0 && (
+                    <select value={qiCardId} onChange={e => setQiCardId(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-amber-500/50 text-sm appearance-none"
+                    >{cards.map(c => <option key={c.id} value={c.id}>💳 {c.name}{c.last_four ? ` (*${c.last_four})` : ''}</option>)}</select>
+                  )}
+                  {qiAmount && qiTotalInstallments && (
+                    <div className="px-3 py-2.5 bg-amber-500/5 border border-amber-500/15 rounded-xl text-xs font-mono text-amber-300">
+                      Aylık: {new Intl.NumberFormat('tr-TR').format(parseFloat(qiAmount) / parseInt(qiTotalInstallments))} ₺
+                      · Kalan: {parseInt(qiTotalInstallments) - parseInt(qiCurrentInstallment) + 1} taksit
+                      · Toplam kalan: {new Intl.NumberFormat('tr-TR').format((parseInt(qiTotalInstallments) - parseInt(qiCurrentInstallment) + 1) * parseFloat(qiAmount) / parseInt(qiTotalInstallments))} ₺
+                    </div>
+                  )}
+                  <button type="submit" disabled={isQiSubmitting || !qiAmount || !qiTotalInstallments}
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-black rounded-xl py-3 font-bold text-sm disabled:opacity-40 flex items-center justify-center gap-2 hover:brightness-110 transition-all"
+                  >{isQiSubmitting ? <><Loader2 size={14} className="animate-spin" /> Kaydediliyor…</> : <><Clock size={14} /> Taksiti Aktar</>}</button>
+                </form>
+              </div>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
-      {/* Installments Modal */}
+      {/* ── Receipt Preview Modal ── */}
+      <AnimatePresence>
+        {previewReceiptUrl && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+            onClick={() => setPreviewReceiptUrl(null)}
+          >
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="relative max-w-lg w-full"
+              onClick={e => e.stopPropagation()}
+            >
+              <img src={previewReceiptUrl} alt="Fiş" className="w-full rounded-2xl border border-white/10 shadow-2xl max-h-[80vh] object-contain bg-black" />
+              <button onClick={() => setPreviewReceiptUrl(null)}
+                className="absolute top-3 right-3 p-2 bg-black/70 rounded-xl text-white hover:bg-black/90"
+              ><X size={18} /></button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Add Card Modal ── */}
+      <AnimatePresence>
+        {showCardModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setShowCardModal(false)}
+          >
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="bg-[var(--color-surface-container)] rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md border border-white/10 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-purple-500/15 border border-purple-500/20"><CreditCard size={16} className="text-purple-400" /></div>
+                  <h3 className="font-bold text-white">Yeni Kart Ekle</h3>
+                </div>
+                <button onClick={() => setShowCardModal(false)} className="p-1.5 rounded-lg bg-white/5 text-[var(--color-text-variant)] hover:text-white hover:bg-white/10"><X size={16} /></button>
+              </div>
+              <div className="overflow-y-auto flex-1 p-5">
+                <form onSubmit={handleAddCard} className="space-y-3">
+                  <input type="text" required value={newCardName} onChange={e => setNewCardName(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                    placeholder="Kart adı (örn: Ziraat Bonus)" autoFocus
+                  />
+                  <input type="text" value={newCardBank} onChange={e => setNewCardBank(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                    placeholder="Banka adı (opsiyonel)"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="text" value={newCardLastFour} onChange={e => setNewCardLastFour(e.target.value)} maxLength={4}
+                      className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm font-mono"
+                      placeholder="Son 4 hane"
+                    />
+                    <input type="number" required value={newCardPaymentDay} onChange={e => setNewCardPaymentDay(e.target.value)} min="1" max="31"
+                      className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                      placeholder="Ödeme günü"
+                    />
+                    <input type="number" value={newCardCutOffDay} onChange={e => setNewCardCutOffDay(e.target.value)} min="1" max="31"
+                      className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm"
+                      placeholder="Kesim günü (opsiyonel)"
+                    />
+                    <input type="number" value={newCardLimit} onChange={e => setNewCardLimit(e.target.value)} step="0.01"
+                      className="px-3 py-2.5 bg-[var(--color-surface-lowest)] text-white border border-white/10 rounded-xl outline-none focus:border-purple-500/50 text-sm font-mono"
+                      placeholder="Limit (opsiyonel)"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-[var(--color-text-variant)] font-mono uppercase mb-1.5 block">Kart Rengi</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {['#8b5cf6', '#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#f97316'].map(color => (
+                        <button key={color} type="button" onClick={() => setNewCardColor(color)}
+                          className={`w-7 h-7 rounded-full border-2 transition-all ${newCardColor === color ? 'scale-110 border-white' : 'border-transparent hover:scale-105'}`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl py-3 font-bold hover:brightness-110 transition-all">Kartı Kaydet</button>
+                </form>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Future Installments Calendar Modal ── */}
       <AnimatePresence>
         {showInstallmentsModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center p-4"
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-center justify-center p-4"
             onClick={() => setShowInstallmentsModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="bg-[var(--color-surface-container)] rounded-3xl w-full max-w-2xl border border-white/10 shadow-2xl overflow-hidden max-h-[85vh] flex flex-col"
-              onClick={(e) => e.stopPropagation()}
+              className="bg-[var(--color-surface-container)] rounded-3xl w-full max-w-lg border border-white/10 shadow-2xl overflow-hidden max-h-[85vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="p-6 border-b border-white/5 bg-gradient-to-r from-purple-500/10 to-pink-500/10 flex justify-between items-center shrink-0">
+              <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-2xl bg-purple-500/20 border border-purple-500/10">
-                    <List size={22} className="text-purple-400" />
-                  </div>
+                  <div className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/20"><Calendar size={16} className="text-purple-400" /></div>
                   <div>
-                    <h3 className="font-bold text-white text-lg">Gelecek Taksitler</h3>
-                    <p className="text-xs text-[var(--color-text-variant)] mt-0.5">
-                      Ay bazlı ödeme planı
-                    </p>
+                    <h3 className="font-bold text-white">Gelecek Taksit Takvimi</h3>
+                    <p className="text-xs text-[var(--color-text-variant)]">Ay bazlı taksit yükleri</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowInstallmentsModal(false)}
-                  className="text-[var(--color-text-variant)] hover:text-white transition-colors bg-white/5 p-2 rounded-xl hover:bg-white/10"
-                >
-                  <X size={18} />
-                </button>
+                <button onClick={() => setShowInstallmentsModal(false)} className="p-1.5 rounded-lg bg-white/5 text-[var(--color-text-variant)] hover:text-white hover:bg-white/10"><X size={16} /></button>
               </div>
-
-              {/* Installments List */}
-              <div className="overflow-y-auto flex-1 p-6">
+              <div className="overflow-y-auto flex-1 p-4 space-y-3">
                 {futureMonthlyInstallments.length === 0 ? (
-                  <div className="p-12 text-center flex flex-col items-center gap-4">
-                    <div className="p-5 rounded-3xl bg-purple-500/5 border border-purple-500/10">
-                      <List size={40} className="text-purple-400/40" />
+                  <div className="py-12 flex flex-col items-center gap-3 text-[var(--color-text-variant)]">
+                    <Calendar size={32} className="opacity-20" />
+                    <p className="text-sm">Gelecek taksit bulunamadı</p>
+                  </div>
+                ) : futureMonthlyInstallments.map(month => (
+                  <div key={month.key} className="rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden">
+                    <div className="px-4 py-3 flex items-center justify-between bg-white/[0.02] border-b border-white/5">
+                      <span className="text-sm font-bold text-white capitalize">{month.label}</span>
+                      <span className="font-black font-mono text-purple-400">{new Intl.NumberFormat('tr-TR').format(month.total)} ₺</span>
                     </div>
-                    <div>
-                      <p className="text-white font-medium">Henüz taksitli işlem yok</p>
-                      <p className="text-[var(--color-text-variant)] text-sm mt-1">
-                        Taksitli harcama girdiğinizde burada görünecek
-                      </p>
+                    <div className="divide-y divide-white/5">
+                      {month.items.map((item: any) => (
+                        <div key={`${month.key}-${item.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02]">
+                          <span className="text-base">{CATEGORY_EMOJIS[item.category] || '📦'}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{item.merchant || item.category}</p>
+                            <span className="text-[10px] text-purple-300 font-mono">{item.currentInstallmentNumber}/{item.installments}. taksit</span>
+                          </div>
+                          <span className="font-mono font-bold text-white text-sm">{new Intl.NumberFormat('tr-TR').format(item.monthlyAmount)} ₺</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-8">
-                    {futureMonthlyInstallments.map((month) => (
-                      <div key={month.key} className="space-y-4">
-                        <div className="flex items-center justify-between px-2">
-                          <h4 className="text-lg font-bold text-white flex items-center gap-2">
-                            <Calendar size={18} className="text-purple-400" />
-                            {month.label}
-                          </h4>
-                          <span className="text-pink-400 font-mono font-bold text-lg">
-                            {new Intl.NumberFormat('tr-TR').format(month.total)} ₺
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 gap-3">
-                          {month.items.map((expense, idx) => (
-                            <div key={`${expense.id}-${month.key}`} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-all">
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex items-start gap-3">
-                                  <div className="p-2 rounded-xl bg-white/5 text-lg">
-                                    {CATEGORY_EMOJIS[expense.category] || '📦'}
-                                  </div>
-                                  <div>
-                                    <p className="font-bold text-white text-sm">{expense.merchant || expense.category}</p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/10">
-                                        {expense.currentInstallmentNumber}/{expense.installments} Taksit
-                                      </span>
-                                      {expense.card_name && (
-                                        <span className="text-[10px] text-[var(--color-text-variant)] flex items-center gap-1 font-mono">
-                                          <CreditCard size={8} /> {expense.card_name}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-mono font-black text-white">
-                                    {new Intl.NumberFormat('tr-TR').format(expense.monthlyAmount)} <span className="text-xs font-normal">₺</span>
-                                  </p>
-                                  <p className="text-[9px] text-[var(--color-text-variant)] mt-0.5">
-                                    Toplam: {new Intl.NumberFormat('tr-TR').format(expense.amount)} ₺
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ))}
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   );
 };

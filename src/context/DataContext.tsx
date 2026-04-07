@@ -68,6 +68,7 @@ interface DataActions {
   // Credit Card Expenses
   addExpense: (e: Partial<CreditCardExpense>) => Promise<{ data: any; error: any }>;
   deleteExpense: (id: string) => Promise<{ error: any }>;
+  updateExpense: (id: string, updates: Partial<CreditCardExpense>) => Promise<{ data: any; error: any }>;
   uploadReceipt: (file: File) => Promise<string | null>;
 
   // Card Installments
@@ -531,6 +532,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error };
   }, [state.creditCardExpenses, updateCardDebt]);
 
+  const updateExpense = useCallback(async (id: string, updates: Partial<CreditCardExpense>) => {
+    const { data, error } = await supabase.from('credit_card_expenses').update(updates).eq('id', id).select();
+    if (data && data.length > 0) {
+      setState(prev => ({ ...prev, creditCardExpenses: prev.creditCardExpenses.map(e => e.id === id ? (data[0] as CreditCardExpense) : e) }));
+    }
+    return { data, error };
+  }, []);
+
   const uploadReceipt = useCallback(async (file: File): Promise<string | null> => {
     if (!user) return null;
     const fileExt = file.name.split('.').pop();
@@ -708,7 +717,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addRecurring, deleteRecurring, updateRecurring,
     addAccount, deleteAccount, updateAccount,
     addCard, deleteCard, updateCard,
-    addExpense, deleteExpense, uploadReceipt,
+    addExpense, deleteExpense, updateExpense, uploadReceipt,
     addCardInstallment, deleteCardInstallment,
     addGoldDay, deleteGoldDay,
     addBes, deleteBes, updateBes,
