@@ -756,9 +756,6 @@ export const SavingsPage = () => {
                           let iterDate = new Date(created.getFullYear(), created.getMonth(), li.payment_day || 1);
                           if (iterDate < created) iterDate.setMonth(iterDate.getMonth() + 1);
                           while (iterDate <= today) { paidMonths++; iterDate.setMonth(iterDate.getMonth() + 1); }
-                          // Bu ayki ödeme günü henüz gelmemişse bir azalt
-                          const thisMonthPayDay = new Date(today.getFullYear(), today.getMonth(), li.payment_day || 1);
-                          if (today < thisMonthPayDay) paidMonths = Math.max(0, paidMonths - 1);
 
                           const totalPaid = li.initial_amount + (paidMonths * li.monthly_payment) + li.extra_payments_total;
                           const totalMaturityMonths = li.maturity_years * 12;
