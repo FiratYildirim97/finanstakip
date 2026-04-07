@@ -74,7 +74,11 @@ export const RecurringTransactionsPage = () => {
     return list;
   }, []);
 
-  const [selectedPeriodIndex, setSelectedPeriodIndex] = useState(6); // Default to current month (offset -6)
+  const [selectedPeriodIndex, setSelectedPeriodIndex] = useState(() => {
+    const today = new Date();
+    return today.getDate() < 15 ? 5 : 6;
+  }); // Default to current or previous month based on date
+
   const currentPeriod = periods[selectedPeriodIndex] || periods[0];
 
   // Forms and filtering state
@@ -445,16 +449,27 @@ export const RecurringTransactionsPage = () => {
                 <div className="absolute top-0 right-0 p-3 text-white/5 group-hover:text-white/10 transition-colors">
                    <Clock size={48} strokeWidth={1} />
                 </div>
-                <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono mb-4">Ödeme Planı (Dönem)</p>
-                <div className="space-y-1">
-                  <h3 className="text-2xl font-black font-mono text-white">
-                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(planned.expense)}
-                  </h3>
-                  <p className="text-[10px] text-[var(--color-text-variant)] font-mono">Toplam planlanan gider bütçesi</p>
-                  
+                <p className="text-[10px] font-bold text-[var(--color-text-variant)] uppercase tracking-widest font-mono mb-4">Planlanan (Nakit Akışı)</p>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm font-mono">
+                    <span className="text-white/60">Beklenen (+)</span>
+                    <span className="text-white font-bold">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(planned.income)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm font-mono">
+                    <span className="text-white/60">Planlanan (-)</span>
+                    <span className="text-white font-bold">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(planned.expense)}</span>
+                  </div>
+                  <div className="h-px bg-white/5 my-2" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-[var(--color-text-variant)]">Hedef Kalan +/-</span>
+                    <span className={`text-xl font-black font-mono ${planned.net >= 0 ? 'text-[#4edeb3]' : 'text-[#ff7886]'}`}>
+                      {planned.net >= 0 ? '+' : ''}{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(planned.net)}
+                    </span>
+                  </div>
+
                   <div className="mt-4 pt-4 border-t border-white/5">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-white/60">Bekleyen Ödemeler:</span>
+                    <div className="flex justify-between items-center text-[10px] font-mono">
+                      <span className="text-white/40">Bekleyen Giderler:</span>
                       <span className="text-[#ffcf70] font-bold">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(unpaidExpenses)}</span>
                     </div>
                   </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, FormEvent, useRef, useCallback } from 'react';
+import React, { useState, useEffect, FormEvent, useRef, useCallback, useMemo } from 'react';
 import { useCreditCardExpenses } from '../hooks/useCreditCardExpenses';
 import { useCreditCards } from '../hooks/useCreditCards';
 import { receiptAgent } from '../lib/agents';
@@ -384,26 +384,26 @@ export const TransactionsPage = () => {
   // Filtered expenses
   const selectedCard = cards.find(c => c.id === filterCardId);
 
-  const cardFilteredExpenses = filterCardId
+  const cardFilteredExpenses = useMemo(() => filterCardId
     ? expenses.filter(e => e.card_id === filterCardId)
-    : expenses;
+    : expenses, [filterCardId, expenses]);
 
-  const filteredExpenses = selectedFilter === 'all'
+  const filteredExpenses = useMemo(() => selectedFilter === 'all'
     ? cardFilteredExpenses
-    : cardFilteredExpenses.filter(e => e.category === selectedFilter);
+    : cardFilteredExpenses.filter(e => e.category === selectedFilter), [selectedFilter, cardFilteredExpenses]);
 
-  const filteredTotalExpenses = cardFilteredExpenses.reduce((sum, expense) => {
+  const filteredTotalExpenses = useMemo(() => cardFilteredExpenses.reduce((sum, expense) => {
     if (expense.is_exempt) return sum;
     if (expense.installments > 1) {
       // Taksitli olunca sadece o aya yansıyan (ilk) taksit tutarını yansıt
       return sum + (expense.amount / expense.installments);
     }
     return sum + expense.amount;
-  }, 0);
+  }, 0), [cardFilteredExpenses]);
 
-  const installmentExpenses = cardFilteredExpenses.filter(e => e.installments > 1);
+  const installmentExpenses = useMemo(() => cardFilteredExpenses.filter(e => e.installments > 1), [cardFilteredExpenses]);
 
-  const installmentGroups = installmentExpenses.reduce((groups, expense) => {
+  const installmentGroups = useMemo<Record<string, { cardName: string; items: any[] }>>(() => installmentExpenses.reduce((groups, expense) => {
     const groupKey = expense.card_id || 'no-card';
     if (!groups[groupKey]) {
       groups[groupKey] = {
@@ -413,10 +413,10 @@ export const TransactionsPage = () => {
     }
     groups[groupKey].items.push(expense);
     return groups;
-  }, {} as Record<string, { cardName: string; items: typeof installmentExpenses }>);
+  }, {} as Record<string, { cardName: string; items: any[] }>), [installmentExpenses]);
 
   // Ay bazlı gelecek taksitler hesaplama
-  const futureMonthlyInstallments = (() => {
+  const futureMonthlyInstallments = useMemo(() => {
     const monthlyData: Record<string, { total: number; label: string; items: any[] }> = {};
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -455,18 +455,18 @@ export const TransactionsPage = () => {
         key,
         ...monthlyData[key]
       }));
-  })();
+  }, [expenses]);
 
-  const expensesBySelectedCardCategory = cardFilteredExpenses.reduce<Record<string, number>>((acc, expense) => {
+  const expensesBySelectedCardCategory = useMemo(() => cardFilteredExpenses.reduce<Record<string, number>>((acc, expense) => {
     if (expense.is_exempt) return acc;
     const effectiveAmount = expense.installments > 1 ? expense.amount / expense.installments : expense.amount;
     acc[expense.category] = (acc[expense.category] || 0) + effectiveAmount;
     return acc;
-  }, {});
+  }, {}), [cardFilteredExpenses]);
 
-  const sortedCategories = Object.entries(expensesBySelectedCardCategory)
+  const sortedCategories = useMemo(() => Object.entries(expensesBySelectedCardCategory)
     .sort(([, a], [, b]) => (b as number) - (a as number))
-    .slice(0, 5);
+    .slice(0, 5), [expensesBySelectedCardCategory]);
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -1311,7 +1311,7 @@ export const TransactionsPage = () => {
             })()}
 
             <div className="space-y-4">
-              {Object.entries(installmentGroups).map(([groupKey, group]) => (
+              {Object.entries(installmentGroups).map(([groupKey, group]: [string, any]) => (
                 <div key={groupKey} className="space-y-3">
                   <div className="flex items-center gap-2 px-1">
                     <CreditCard size={13} className="text-purple-300" />
